@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net"
 	"os"
@@ -9,7 +10,17 @@ import (
 	"github.com/things-go/go-socks5"
 )
 
+const (
+	Version = "0.1.0"
+)
+
 func main() {
+
+	if len(os.Args) > 1 && os.Args[1] == "version" {
+		fmt.Printf("gs-proxy version %s\n", Version)
+		return
+	}
+
 	logger := log.New(os.Stdout, "socks5: ", log.LstdFlags)
 
 	// Get credentials from environment variables
