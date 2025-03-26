@@ -25,3 +25,16 @@ spec:
             - containerPort: {{ .Values.service.port }}
           securityContext:
             {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          {{- if .Values.auth.enabled }}
+          env:
+            - name: PROXY_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.auth.secret.name }}
+                  key: {{ .Values.auth.secret.usernameKey }}
+            - name: PROXY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.auth.secret.name }}
+                  key: {{ .Values.auth.secret.passwordKey }}
+          {{- end }}
