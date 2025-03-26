@@ -3,6 +3,6 @@ name: gs-proxy
 description: A Helm chart for the Giant Swarm Proxy
 type: application
 version: 0.1.0
-appVersion: "0.0.0-96165a1aa17e"
+appVersion: "0.0.0-378839f763421eb458a3594ab5a24d23b00cd2c2"
 annotations:
   application.giantswarm.io/team: "hackathon"

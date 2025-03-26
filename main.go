@@ -16,26 +16,28 @@ func main() {
 	username := getEnvOrDefault("PROXY_USERNAME", "")
 	password := getEnvOrDefault("PROXY_PASSWORD", "")
 
-	var authenticator socks5.Authenticator
+	// Setup server options
+	opts := []socks5.Option{
+		socks5.WithLogger(socks5.NewLogger(logger)),
+		socks5.WithDial(LoggingDialer),
+	}
+
 	if username != "" && password != "" {
 		// Use static credentials authenticator if credentials are provided
 		creds := socks5.StaticCredentials{
 			username: password,
 		}
-		authenticator = socks5.UserPassAuthenticator{Credentials: creds}
+		authenticator := socks5.UserPassAuthenticator{Credentials: creds}
+		opts = append(opts, socks5.WithAuthMethods([]socks5.Authenticator{authenticator}))
 		log.Println("Authentication enabled")
 	} else {
-		log.Println("Warning: No authentication credentials provided")
+		noAuth := socks5.NoAuthAuthenticator{}
+		opts = append(opts, socks5.WithAuthMethods([]socks5.Authenticator{noAuth}))
+		log.Println("No authentication required")
 	}
 
-	// Create a SOCKS5 server with authentication
-	server := socks5.NewServer(
-		socks5.WithLogger(socks5.NewLogger(logger)),
-		socks5.WithDial(LoggingDialer),
-		socks5.WithAuthMethods([]socks5.Authenticator{authenticator}),
-	)
+	server := socks5.NewServer(opts...)
 
-	// Create SOCKS5 proxy on localhost port 8000
 	log.Println("Starting SOCKS5 proxy server on :8000")
 	if err := server.ListenAndServe("tcp", ":8000"); err != nil {
 		panic(err)
