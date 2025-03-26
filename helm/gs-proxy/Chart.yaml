@@ -1,0 +1,8 @@
+apiVersion: v2
+name: gs-proxy
+description: A Helm chart for the Giant Swarm Proxy
+type: application
+version: 0.1.0
+appVersion: "0.0.0-67b552750b5b469040624af55894527dcb4d6321"
+annotations:
+  application.giantswarm.io/team: "hackathon"
