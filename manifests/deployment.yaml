@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gs-proxy
+  labels:
+    app: gs-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gs-proxy
+  template:
+    metadata:
+      labels:
+        app: gs-proxy
+    spec:
+      containers:
+      - name: gs-proxy
+        image: gcr.io/PROJECT_ID/gs-proxy:latest
+        ports:
+        - containerPort: 8000
