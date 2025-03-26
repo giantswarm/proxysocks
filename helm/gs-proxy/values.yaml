@@ -42,3 +42,8 @@ containerSecurityContext:
   capabilities:
     drop:
       - ALL
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 100Mi

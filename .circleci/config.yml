@@ -7,13 +7,13 @@ workflows:
   test:
     jobs:
       - architect/go-build:
-          context: architect
           name: go-build
-          binary: template
+          binary: gs-proxy
           filters:
             # Trigger job also on git tag.
             tags:
               only: /^v.*/
+
       - architect/push-to-registries:
           context: architect
           name: push-to-registries
@@ -27,6 +27,7 @@ workflows:
               ignore:
                 - main
                 - master
+
       - architect/push-to-app-catalog:
           executor: app-build-suite
           context: architect
