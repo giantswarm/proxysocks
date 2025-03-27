@@ -4,7 +4,7 @@ replicaCount: 1
 
 image:
   repository: quay.io/giantswarm/gs-proxy
-  tag: "0.0.0-378839f763421eb458a3594ab5a24d23b00cd2c2"
+  tag: ""
   pullPolicy: IfNotPresent
 
 # Authentication configuration
