@@ -1,4 +1,4 @@
-# General Go template repository
+# gs-proxy
 
 This is a general template repository containing some basic files every GitHub repo owned by Giant Swarm should have.
 
