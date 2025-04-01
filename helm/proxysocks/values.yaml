@@ -3,7 +3,7 @@ serviceType: "managed"
 replicaCount: 1
 
 image:
-  repository: quay.io/giantswarm/gs-proxy
+  repository: quay.io/giantswarm/proxysocks
   tag: ""
   pullPolicy: IfNotPresent
 
