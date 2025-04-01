@@ -29,14 +29,14 @@ service:
     service.beta.kubernetes.io/aws-load-balancer-internal: "true"
     giantswarm.io/external-dns: managed
 
-securityContext:
+podSecurityContext:
   runAsUser: 1000
   runAsGroup: 1000
   runAsNonRoot: true
   seccompProfile:
     type: RuntimeDefault
 
-containerSecurityContext:
+securityContext:
   allowPrivilegeEscalation: false
   readOnlyRootFilesystem: true
   capabilities:
