@@ -1,4 +1,4 @@
-module github.com/giantswarm/gs-proxy
+module github.com/giantswarm/proxysocks
 
 go 1.24.1
 

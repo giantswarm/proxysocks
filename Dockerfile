@@ -4,8 +4,8 @@ FROM scratch
 COPY --from=0 /etc/passwd /etc/passwd
 COPY --from=0 /etc/group /etc/group
 
-ADD gs-proxy /
+ADD proxysocks /
 USER giantswarm
 
-ENTRYPOINT ["/gs-proxy"]
+ENTRYPOINT ["/proxysocks"]
 

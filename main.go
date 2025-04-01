@@ -1,6 +1,6 @@
 package main
 
-import "github.com/giantswarm/gs-proxy/cmd"
+import "github.com/giantswarm/proxysocks/cmd"
 
 func main() {
 	cmd.Execute()

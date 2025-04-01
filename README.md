@@ -1,27 +1,42 @@
-# gs-proxy
+# proxysocks
 
-This is a general template repository containing some basic files every GitHub repo owned by Giant Swarm should have.
+This application is a SOCKS5 proxy server that forwards traffic to a given HTTP proxy. It is intended to be used in environments where direct access to the internet is not possible, but an HTTP proxy is available.
 
-Note also these more specific repositories:
+## Deployment
 
-- [template-app](https://github.com/giantswarm/template-app)
-- [gitops-template](https://github.com/giantswarm/gitops-template)
-- [python-app-template](https://github.com/giantswarm/python-app-template)
+This app can be deployed using the following CR:
 
-## Creating a new repository
+```yaml
+apiVersion: application.giantswarm.io/v1alpha1
+kind: App
+metadata:
+  labels:
+    giantswarm.io/cluster: <cluster-id>
+  name: <cluster-id>-proxysocks
+  namespace: <org-namespace>
+spec:
+  catalog: giantswarm-playground-test
+  config:
+    configMap:
+      name: <cluster-id>-cluster-values
+      namespace: <org-namespace>
+    secret:
+      name: ""
+      namespace: ""
+  kubeConfig:
+    context:
+      name: <cluster-id>-kubeconfig
+    inCluster: false
+    secret:
+      name: <cluster-id>-kubeconfig
+      namespace: <org-namespace>
+  name: proxysocks
+  namespace: proxysocks
+  version: 0.1.0
+```
 
-Please do not use the `Use this template` function in the GitHub web UI.
 
-Check out the according [handbook article](https://handbook.giantswarm.io/docs/dev-and-releng/repository/go/) for better instructions.
+### Configuration
 
-### Some suggestions for your README
+TODO: Add config examples.
 
-After you have created your new repository, you may want to add some of these badges to the top of your README.
-
-- **CircleCI:** After enabling builds for this repo via [this link](https://circleci.com/setup-project/gh/giantswarm/REPOSITORY_NAME), you can find badge code on [this page](https://app.circleci.com/settings/project/github/giantswarm/REPOSITORY_NAME/status-badges).
-
-- **Go reference:** use [this helper](https://pkg.go.dev/badge/) to create the markdown code.
-
-- **Go report card:** enter the module name on the [front page](https://goreportcard.com/) and hit "Generate report". Then use this markdown code for your badge: `[![Go report card](https://goreportcard.com/badge/github.com/giantswarm/REPOSITORY_NAME)](https://goreportcard.com/report/github.com/giantswarm/REPOSITORY_NAME)`
-
-- **Sourcegraph "used by N projects" badge**: for public Go repos only: `[![Sourcegraph](https://sourcegraph.com/github.com/giantswarm/REPOSITORY_NAME/-/badge.svg)](https://sourcegraph.com/github.com/giantswarm/REPOSITORY_NAME)`
