@@ -22,7 +22,8 @@ spec:
           image: "{{.Values.image.registry}}/{{.Values.image.name}}:{{ include "image.tag" . }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
-            - containerPort: {{ .Values.service.port }}
+            - name: socks5
+              containerPort: {{ .Values.service.port }}
           {{- with .Values.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
