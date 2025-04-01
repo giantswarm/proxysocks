@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Release.Name }}
+  name: {{ include "name" . }}
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "labels.common" . | nindent 4 }}
@@ -16,29 +16,22 @@ spec:
         {{- include "labels.common" . | nindent 8 }}
     spec:
       securityContext:
-        {{- toYaml .Values.securityContext | nindent 8 }}
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
-        - name: gs-proxy
-          image: "{{ .Values.image.repository }}:{{ include "image.tag" . }}"
+        - name: proxysocks
+          image: "{{.Values.image.registry}}/{{.Values.image.name}}:{{ include "image.tag" . }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
-            - containerPort: {{ .Values.service.port }}
+            - name: socks5
+              containerPort: {{ .Values.service.port }}
           {{- with .Values.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
           securityContext:
-            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+            {{- toYaml .Values.securityContext | nindent 12 }}
           {{- if .Values.auth.enabled }}
-          env:
-            - name: PROXY_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.auth.secret.name }}
-                  key: {{ .Values.auth.secret.usernameKey }}
-            - name: PROXY_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.auth.secret.name }}
-                  key: {{ .Values.auth.secret.passwordKey }}
+          envFrom:
+            - secretRef:
+                name: {{ include "name" . }}
           {{- end }}

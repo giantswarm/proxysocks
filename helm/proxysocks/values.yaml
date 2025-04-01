@@ -1,22 +1,15 @@
-name: gs-proxy
 serviceType: "managed"
 replicaCount: 1
 
 image:
-  repository: quay.io/giantswarm/proxysocks
+  registry: gsoci.azurecr.io
+  name: giantswarm/proxysocks
   tag: ""
   pullPolicy: IfNotPresent
 
 # Authentication configuration
 auth:
   enabled: true
-  createSecret: true
-
-  secret:
-    name: "gs-proxy-auth"
-    usernameKey: "username"
-    passwordKey: "password"
-
   credentials:
     username: "admin"
     password: "changeme"
@@ -25,18 +18,16 @@ service:
   type: LoadBalancer
   port: 8000
   annotations:
-    external-dns.alpha.kubernetes.io/hostname: "proxy.hackathon-dx.gaws.gigantic.io"
     service.beta.kubernetes.io/aws-load-balancer-internal: "true"
-    giantswarm.io/external-dns: managed
 
-securityContext:
+podSecurityContext:
   runAsUser: 1000
   runAsGroup: 1000
   runAsNonRoot: true
   seccompProfile:
     type: RuntimeDefault
 
-containerSecurityContext:
+securityContext:
   allowPrivilegeEscalation: false
   readOnlyRootFilesystem: true
   capabilities:
