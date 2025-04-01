@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
 
+- Initial release of the app.
+- Add support for credentials
 
 [Unreleased]: https://github.com/giantswarm/REPOSITORY_NAME/tree/main
