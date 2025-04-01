@@ -31,15 +31,7 @@ spec:
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           {{- if .Values.auth.enabled }}
-          env:
-            - name: PROXY_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.auth.secret.name }}
-                  key: {{ .Values.auth.secret.usernameKey }}
-            - name: PROXY_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.auth.secret.name }}
-                  key: {{ .Values.auth.secret.passwordKey }}
+          envFrom:
+            - secretRef:
+                name: {{ include "name" . }}
           {{- end }}

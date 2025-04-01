@@ -10,13 +10,6 @@ image:
 # Authentication configuration
 auth:
   enabled: true
-  createSecret: true
-
-  secret:
-    name: "gs-proxy-auth"
-    usernameKey: "username"
-    passwordKey: "password"
-
   credentials:
     username: "admin"
     password: "changeme"
