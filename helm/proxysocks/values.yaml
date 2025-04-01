@@ -1,9 +1,9 @@
-name: gs-proxy
 serviceType: "managed"
 replicaCount: 1
 
 image:
-  repository: quay.io/giantswarm/proxysocks
+  registry: gsoci.azurecr.io
+  name: giantswarm/proxysocks
   tag: ""
   pullPolicy: IfNotPresent
 
