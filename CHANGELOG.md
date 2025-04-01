@@ -9,9 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2025-04-01
+
 ### Added
 
 - Initial release of the app.
 - Add support for credentials
 
-[Unreleased]: https://github.com/giantswarm/REPOSITORY_NAME/tree/main
+[Unreleased]: https://github.com/giantswarm/proxysocks/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/giantswarm/proxysocks/releases/tag/v0.1.0
