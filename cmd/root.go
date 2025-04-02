@@ -55,8 +55,8 @@ to quickly create a Cobra application.`,
 
 		server := socks5.NewServer(opts...)
 
-		log.Println("Starting SOCKS5 proxy server on :8000")
-		if err := server.ListenAndServe("tcp", ":8000"); err != nil {
+		log.Println("Starting SOCKS5 proxy server on :1080")
+		if err := server.ListenAndServe("tcp", ":1080"); err != nil {
 			panic(err)
 		}
 	},

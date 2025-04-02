@@ -15,6 +15,6 @@ spec:
   type: {{ .Values.service.type }}
   ports:
     - port: {{ .Values.service.port }}
-      targetPort: {{ .Values.service.port }}
+      targetPort: socks5
   selector:
     {{- include "labels.selector" . | nindent 4 }}

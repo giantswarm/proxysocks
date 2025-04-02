@@ -23,7 +23,7 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: socks5
-              containerPort: {{ .Values.service.port }}
+              containerPort: 1080
           {{- with .Values.resources }}
           resources:
             {{- toYaml . | nindent 12 }}

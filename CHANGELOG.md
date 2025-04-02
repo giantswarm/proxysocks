@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Make service port configurable and default to 1080 (SOCKS standard).
+
 ## [0.1.1] - 2025-04-02
 
 ### Fixed
