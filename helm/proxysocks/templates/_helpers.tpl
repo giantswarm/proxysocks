@@ -30,7 +30,10 @@ helm.sh/chart: {{ include "chart" . | quote }}
 Selector labels
 */}}
 {{- define "labels.selector" -}}
-app: {{ .Values.name | quote }}
+app: {{ include "name" . | quote }}
+{{- end -}}
+
+{{/*
 {{- end -}}
 
 {{/*
