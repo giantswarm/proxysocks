@@ -34,9 +34,6 @@ app: {{ include "name" . | quote }}
 {{- end -}}
 
 {{/*
-{{- end -}}
-
-{{/*
 Define image tag.
 */}}
 {{- define "image.tag" -}}
