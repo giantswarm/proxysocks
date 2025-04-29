@@ -1,7 +1,7 @@
 <!-- (Please set a descriptive PR title. Use this space for additional explanations.) -->
 
 This PR:
-- [ ] ...
+- ...
 
 Towards: 
 
