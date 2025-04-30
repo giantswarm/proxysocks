@@ -5,9 +5,10 @@ import (
 	"log"
 	"os"
 
-	"github.com/giantswarm/proxysocks/internal/server"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/giantswarm/proxysocks/internal/server"
 )
 
 var cfgFile string
@@ -29,7 +30,6 @@ to quickly create a Cobra application.`,
 		log.Println("Starting SOCKS5 proxy server on :8000")
 		server := server.New()
 		if err := server.ListenAndServe("tcp", ":8000"); err != nil {
-			panic(err)
 		}
 	},
 }
