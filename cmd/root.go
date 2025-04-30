@@ -30,6 +30,7 @@ to quickly create a Cobra application.`,
 		log.Println("Starting SOCKS5 proxy server on :8000")
 		server := server.New()
 		if err := server.ListenAndServe("tcp", ":8000"); err != nil {
+			panic(err)
 		}
 	},
 }
