@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Upgrade things-go/go-socks5 to v0.0.6.
+- Move proxy logic into its own internal package.
+- Handle logging with the UserConnectionMiddleware.
 
 ## [0.1.1] - 2025-04-02
 
