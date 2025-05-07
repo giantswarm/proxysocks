@@ -9,8 +9,9 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/giantswarm/proxysocks/internal/server"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+
+	"github.com/giantswarm/proxysocks/internal/server"
 )
 
 var cfgFile string
