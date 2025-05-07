@@ -3,12 +3,14 @@ package cmd
 import (
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
 	"github.com/giantswarm/proxysocks/internal/server"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 var cfgFile string
@@ -26,6 +28,14 @@ to quickly create a Cobra application.`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	Run: func(cmd *cobra.Command, args []string) {
+
+		http.HandleFunc("/healthz", health)
+		http.Handle("/metrics", promhttp.Handler())
+
+		go func() {
+			log.Println("Starting HTTP server on :8090")
+			http.ListenAndServe(":8090", nil)
+		}()
 
 		log.Println("Starting SOCKS5 proxy server on :8000")
 		server := server.New()
@@ -80,4 +90,8 @@ func initConfig() {
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 	}
+}
+
+func health(w http.ResponseWriter, req *http.Request) {
+	fmt.Fprintf(w, "ok\n")
 }
