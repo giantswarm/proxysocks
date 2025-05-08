@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -35,7 +36,13 @@ to quickly create a Cobra application.`,
 
 		go func() {
 			log.Println("Starting HTTP server on :8090")
-			http.ListenAndServe(":8090", nil)
+			err := http.ListenAndServe(":8090", nil)
+			if errors.Is(err, http.ErrServerClosed) {
+				fmt.Printf("server closed\n")
+			} else if err != nil {
+				fmt.Printf("error starting server: %s\n", err)
+				os.Exit(1)
+			}
 		}()
 
 		log.Println("Starting SOCKS5 proxy server on :8000")
@@ -94,5 +101,5 @@ func initConfig() {
 }
 
 func health(w http.ResponseWriter, req *http.Request) {
-	fmt.Fprintf(w, "ok\n")
+	_, _ = fmt.Fprintf(w, "ok\n")
 }
