@@ -45,8 +45,7 @@ func New() *socks5.Server {
 	}
 	opts = append(opts, socks5.WithAuthMethods([]socks5.Authenticator{authenticator}))
 
-	// Setup metrics
-
+	// Setup server
 	server := socks5.NewServer(opts...)
 	return server
 }
