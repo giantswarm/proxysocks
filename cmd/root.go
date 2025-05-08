@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -36,7 +37,14 @@ to quickly create a Cobra application.`,
 
 		go func() {
 			log.Println("Starting HTTP server on :8090")
-			err := http.ListenAndServe(":8090", nil)
+			server := &http.Server{
+				Addr:         ":8090",
+				Handler:      nil,
+				ReadTimeout:  5 * time.Second,
+				WriteTimeout: 10 * time.Second,
+				IdleTimeout:  15 * time.Second,
+			}
+			err := server.ListenAndServe()
 			if errors.Is(err, http.ErrServerClosed) {
 				fmt.Printf("server closed\n")
 			} else if err != nil {
