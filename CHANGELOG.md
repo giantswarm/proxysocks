@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Add health endpoint
+- Add metrics endpoint
+- Add proxysocks_user_connect_total metric
+
 ### Changed
 
 - Upgrade things-go/go-socks5 to v0.0.6.

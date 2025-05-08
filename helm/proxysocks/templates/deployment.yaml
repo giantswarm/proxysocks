@@ -22,8 +22,16 @@ spec:
           image: "{{.Values.image.registry}}/{{.Values.image.name}}:{{ include "image.tag" . }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
+            - name: metrics
+              containerPort: 8090
             - name: socks5
               containerPort: {{ .Values.service.port }}
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8090
+            initialDelaySeconds: 5
+            periodSeconds: 10
           {{- with .Values.resources }}
           resources:
             {{- toYaml . | nindent 12 }}

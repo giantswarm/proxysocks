@@ -1,12 +1,17 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/giantswarm/proxysocks/internal/server"
 )
@@ -26,6 +31,27 @@ to quickly create a Cobra application.`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	Run: func(cmd *cobra.Command, args []string) {
+
+		http.HandleFunc("/healthz", health)
+		http.Handle("/metrics", promhttp.Handler())
+
+		go func() {
+			log.Println("Starting HTTP server on :8090")
+			server := &http.Server{
+				Addr:         ":8090",
+				Handler:      nil,
+				ReadTimeout:  5 * time.Second,
+				WriteTimeout: 10 * time.Second,
+				IdleTimeout:  15 * time.Second,
+			}
+			err := server.ListenAndServe()
+			if errors.Is(err, http.ErrServerClosed) {
+				fmt.Printf("server closed\n")
+			} else if err != nil {
+				fmt.Printf("error starting server: %s\n", err)
+				os.Exit(1)
+			}
+		}()
 
 		log.Println("Starting SOCKS5 proxy server on :8000")
 		server := server.New()
@@ -80,4 +106,8 @@ func initConfig() {
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 	}
+}
+
+func health(w http.ResponseWriter, req *http.Request) {
+	_, _ = fmt.Fprintf(w, "ok\n")
 }
