@@ -8,4 +8,3 @@ appVersion: 0.1.1
 annotations:
   io.giantswarm.application.team: cabbage
   io.giantswarm.application.audience: "giantswarm"
-  io.giantswarm.application.managed: "false"
