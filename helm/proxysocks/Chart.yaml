@@ -6,4 +6,5 @@ version: 0.2.1
 icon: https://s.giantswarm.io/app-icons/giantswarm/1/light.svg
 appVersion: 0.1.1
 annotations:
-  application.giantswarm.io/team: "cabbage"
+  io.giantswarm.application.team: cabbage
+  io.giantswarm.application.audience: "giantswarm"
