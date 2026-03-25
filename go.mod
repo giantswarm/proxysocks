@@ -6,7 +6,7 @@ require (
 	github.com/prometheus/client_golang v1.23.2
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
-	github.com/things-go/go-socks5 v0.1.0
+	github.com/things-go/go-socks5 v0.1.1
 )
 
 require (
