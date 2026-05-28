@@ -1,1 +1,1 @@
-CVE-2025-11065 until=2025-11-23 # github.com/go-viper/mapstructure/v2@v2.2.1
+CVE-2026-39824 until=2026-06-27 # golang.org/x/sys@v0.35.0
