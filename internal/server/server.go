@@ -91,6 +91,8 @@ func authenticatorFromConfig() (socks5.Authenticator, error) {
 
 // loadUsers reads the users config file if it exists. A missing file is not an
 // error and yields an empty list so the caller can fall back to other sources.
+// A present file that yields no users is an error, so a misconfigured mount
+// cannot silently start the server without authentication.
 func loadUsers() ([]user, error) {
 	path := os.Getenv("PROXY_CONFIG_FILE")
 	if path == "" {
@@ -112,6 +114,9 @@ func loadUsers() ([]user, error) {
 	var users []user
 	if err := v.UnmarshalKey("users", &users); err != nil {
 		return nil, fmt.Errorf("parsing users from %q: %w", path, err)
+	}
+	if len(users) == 0 {
+		return nil, fmt.Errorf("config file %q contains no users", path)
 	}
 	return users, nil
 }
