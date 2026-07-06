@@ -8,65 +8,38 @@
                 "createSecret": {
                     "type": "boolean"
                 },
-                "credentials": {
-                    "type": "object",
-                    "properties": {
-                        "password": {
-                            "type": "string"
-                        },
-                        "username": {
-                            "type": "string"
-                        }
-                    }
-                },
                 "enabled": {
                     "type": "boolean"
                 },
-                "secret": {
-                    "type": "object",
-                    "properties": {
-                        "name": {
-                            "type": "string"
-                        },
-                        "passwordKey": {
-                            "type": "string"
-                        },
-                        "usernameKey": {
-                            "type": "string"
-                        }
-                    }
-                }
-            }
-        },
-        "containerSecurityContext": {
-            "type": "object",
-            "properties": {
-                "allowPrivilegeEscalation": {
-                    "type": "boolean"
+                "existingSecret": {
+                    "type": "string"
                 },
-                "capabilities": {
-                    "type": "object",
-                    "properties": {
-                        "drop": {
-                            "type": "array",
-                            "items": {
+                "users": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "password": {
+                                "type": "string"
+                            },
+                            "username": {
                                 "type": "string"
                             }
                         }
                     }
-                },
-                "readOnlyRootFilesystem": {
-                    "type": "boolean"
                 }
             }
         },
         "image": {
             "type": "object",
             "properties": {
+                "name": {
+                    "type": "string"
+                },
                 "pullPolicy": {
                     "type": "string"
                 },
-                "repository": {
+                "registry": {
                     "type": "string"
                 },
                 "tag": {
@@ -74,13 +47,7 @@
                 }
             }
         },
-        "name": {
-            "type": "string"
-        },
-        "replicaCount": {
-            "type": "integer"
-        },
-        "securityContext": {
+        "podSecurityContext": {
             "type": "object",
             "properties": {
                 "runAsGroup": {
@@ -102,18 +69,61 @@
                 }
             }
         },
+        "replicaCount": {
+            "type": "integer"
+        },
+        "resources": {
+            "type": "object",
+            "properties": {
+                "limits": {
+                    "type": "object",
+                    "properties": {
+                        "memory": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "requests": {
+                    "type": "object",
+                    "properties": {
+                        "cpu": {
+                            "type": "string"
+                        },
+                        "memory": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "securityContext": {
+            "type": "object",
+            "properties": {
+                "allowPrivilegeEscalation": {
+                    "type": "boolean"
+                },
+                "capabilities": {
+                    "type": "object",
+                    "properties": {
+                        "drop": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "readOnlyRootFilesystem": {
+                    "type": "boolean"
+                }
+            }
+        },
         "service": {
             "type": "object",
             "properties": {
                 "annotations": {
                     "type": "object",
                     "properties": {
-                        "external-dns.alpha.kubernetes.io/hostname": {
-                            "type": "string"
-                        },
-                        "giantswarm.io/external-dns": {
-                            "type": "string"
-                        },
                         "service.beta.kubernetes.io/aws-load-balancer-internal": {
                             "type": "string"
                         }

@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Support multiple users via an `auth.users` list, loaded from a Secret-mounted config file.
+- Add `user` label to the `proxysocks_user_connect_total` metric.
+
+### Changed
+
+- Deliver credentials through a mounted config file instead of environment variables.
+
+### Fixed
+
+- Correct the misspelled `PROXY_PASSWOWD` Secret key that prevented password auth via the chart.
+
 ## [0.2.1] - 2025-08-27
 
 ### Changed

@@ -38,5 +38,23 @@ spec:
 
 ### Configuration
 
-TODO: Add config examples.
+#### Users
+
+Authentication supports multiple users. Configure them via the `auth.users` list in the Helm values:
+
+```yaml
+auth:
+  enabled: true
+  users:
+    - username: alice
+      password: s3cr3t
+    - username: bob
+      password: hunter2
+```
+
+The chart renders these into a Secret and mounts it at `/etc/proxysocks/users.yaml`. To bring your own Secret instead, set `auth.createSecret: false` and `auth.existingSecret: <name>`; the Secret must contain a `users.yaml` key with the same format.
+
+Credentials are loaded once at startup. Changing users requires updating the Secret and restarting the pod.
+
+To disable authentication entirely, set `auth.enabled: false`.
 

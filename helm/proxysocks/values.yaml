@@ -10,9 +10,13 @@ image:
 # Authentication configuration
 auth:
   enabled: true
-  credentials:
-    username: "admin"
-    password: "changeme"
+  # createSecret renders the users below into a Secret. Set to false and use
+  # existingSecret to bring your own Secret (must contain a users.yaml key).
+  createSecret: true
+  existingSecret: ""
+  users:
+    - username: "admin"
+      password: "changeme"
 
 service:
   type: LoadBalancer

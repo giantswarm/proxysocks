@@ -39,7 +39,17 @@ spec:
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           {{- if .Values.auth.enabled }}
-          envFrom:
-            - secretRef:
-                name: {{ include "name" . }}
+          env:
+            - name: PROXY_CONFIG_FILE
+              value: /etc/proxysocks/users.yaml
+          volumeMounts:
+            - name: users
+              mountPath: /etc/proxysocks
+              readOnly: true
           {{- end }}
+      {{- if .Values.auth.enabled }}
+      volumes:
+        - name: users
+          secret:
+            secretName: {{ .Values.auth.existingSecret | default (include "name" .) }}
+      {{- end }}
