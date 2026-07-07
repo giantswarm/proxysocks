@@ -9,12 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Support multiple users via an `auth.users` list, loaded from a Secret-mounted config file.
+- Support multiple users via a Secret-mounted htpasswd credentials file.
 - Add `user` label to the `proxysocks_user_connect_total` metric.
 
 ### Changed
 
-- Deliver credentials through a mounted config file instead of environment variables.
+- Deliver credentials through a mounted htpasswd file instead of environment variables.
 
 ### Fixed
 

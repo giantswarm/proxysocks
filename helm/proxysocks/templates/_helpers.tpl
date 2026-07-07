@@ -34,7 +34,7 @@ app: {{ include "name" . | quote }}
 {{- end -}}
 
 {{/*
-Name of the Secret providing users.yaml. Fails when authentication is enabled
+Name of the Secret providing the htpasswd file. Fails when authentication is enabled
 but no Secret will be available (createSecret is false and no existingSecret set).
 */}}
 {{- define "auth.secretName" -}}

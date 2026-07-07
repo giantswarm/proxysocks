@@ -1,6 +1,9 @@
 package server
 
 import (
+	"crypto/sha1"
+	"encoding/base64"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -8,10 +11,17 @@ import (
 	"github.com/things-go/go-socks5"
 )
 
+// shaEntry builds an htpasswd line using the {SHA} scheme, which go-htpasswd
+// recognizes via its DefaultSystems parsers.
+func shaEntry(username, password string) string {
+	sum := sha1.Sum([]byte(password))
+	return fmt.Sprintf("%s:{SHA}%s", username, base64.StdEncoding.EncodeToString(sum[:]))
+}
+
 func writeConfig(t *testing.T, content string) string {
 	t.Helper()
 	dir := t.TempDir()
-	path := filepath.Join(dir, "users.yaml")
+	path := filepath.Join(dir, "htpasswd")
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatalf("write config: %s", err)
 	}
@@ -20,7 +30,7 @@ func writeConfig(t *testing.T, content string) string {
 
 func TestAuthenticatorFromConfig(t *testing.T) {
 	t.Run("users from config file", func(t *testing.T) {
-		path := writeConfig(t, "users:\n  - username: alice\n    password: s3cr3t\n  - username: bob\n    password: hunter2\n")
+		path := writeConfig(t, shaEntry("alice", "s3cr3t")+"\n"+shaEntry("bob", "hunter2")+"\n")
 		t.Setenv("PROXY_CONFIG_FILE", path)
 
 		auth, err := authenticatorFromConfig()
@@ -40,7 +50,7 @@ func TestAuthenticatorFromConfig(t *testing.T) {
 	})
 
 	t.Run("duplicate username rejected", func(t *testing.T) {
-		path := writeConfig(t, "users:\n  - username: alice\n    password: a\n  - username: alice\n    password: b\n")
+		path := writeConfig(t, shaEntry("alice", "a")+"\n"+shaEntry("alice", "b")+"\n")
 		t.Setenv("PROXY_CONFIG_FILE", path)
 
 		if _, err := authenticatorFromConfig(); err == nil {
@@ -48,26 +58,26 @@ func TestAuthenticatorFromConfig(t *testing.T) {
 		}
 	})
 
-	t.Run("empty password rejected", func(t *testing.T) {
-		path := writeConfig(t, "users:\n  - username: alice\n    password: \"\"\n")
+	t.Run("malformed line rejected", func(t *testing.T) {
+		path := writeConfig(t, "this-line-has-no-colon\n")
 		t.Setenv("PROXY_CONFIG_FILE", path)
 
 		if _, err := authenticatorFromConfig(); err == nil {
-			t.Fatalf("expected error for empty password")
+			t.Fatalf("expected error for malformed line")
 		}
 	})
 
-	t.Run("empty users file rejected", func(t *testing.T) {
-		path := writeConfig(t, "users: []\n")
+	t.Run("empty file rejected", func(t *testing.T) {
+		path := writeConfig(t, "\n  \n")
 		t.Setenv("PROXY_CONFIG_FILE", path)
 
 		if _, err := authenticatorFromConfig(); err == nil {
-			t.Fatalf("expected error for config file with no users")
+			t.Fatalf("expected error for config file with no credentials")
 		}
 	})
 
 	t.Run("no auth when no config file present", func(t *testing.T) {
-		t.Setenv("PROXY_CONFIG_FILE", filepath.Join(t.TempDir(), "missing.yaml"))
+		t.Setenv("PROXY_CONFIG_FILE", filepath.Join(t.TempDir(), "missing"))
 
 		auth, err := authenticatorFromConfig()
 		if err != nil {

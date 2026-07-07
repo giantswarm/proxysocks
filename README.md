@@ -40,19 +40,17 @@ spec:
 
 #### Users
 
-Authentication supports multiple users. Configure them via the `auth.users` list in the Helm values:
+Authentication supports multiple users. Credentials are provided in [htpasswd](https://httpd.apache.org/docs/current/programs/htpasswd.html) format via the `auth.htpasswd` value. Generate hashed entries with `htpasswd -nB <user>` and paste them in, one per line:
 
 ```yaml
 auth:
   enabled: true
-  users:
-    - username: alice
-      password: s3cr3t
-    - username: bob
-      password: hunter2
+  htpasswd: |
+    alice:$2y$05$Q0F...
+    bob:$2y$05$9aB...
 ```
 
-The chart renders these into a Secret and mounts it at `/etc/proxysocks/users.yaml`. To bring your own Secret instead, set `auth.createSecret: false` and `auth.existingSecret: <name>`; the Secret must contain a `users.yaml` key with the same format.
+The chart renders this into a Secret and mounts it at `/etc/proxysocks/htpasswd`. To bring your own Secret instead, set `auth.createSecret: false` and `auth.existingSecret: <name>`; the Secret must contain an `htpasswd` key with the same format.
 
 Credentials are loaded once at startup. Changing users requires updating the Secret and restarting the pod.
 

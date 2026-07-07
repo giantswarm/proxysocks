@@ -14,19 +14,8 @@
                 "existingSecret": {
                     "type": "string"
                 },
-                "users": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "password": {
-                                "type": "string"
-                            },
-                            "username": {
-                                "type": "string"
-                            }
-                        }
-                    }
+                "htpasswd": {
+                    "type": "string"
                 }
             }
         },

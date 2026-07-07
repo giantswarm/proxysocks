@@ -41,15 +41,15 @@ spec:
           {{- if .Values.auth.enabled }}
           env:
             - name: PROXY_CONFIG_FILE
-              value: /etc/proxysocks/users.yaml
+              value: /etc/proxysocks/htpasswd
           volumeMounts:
-            - name: users
+            - name: htpasswd
               mountPath: /etc/proxysocks
               readOnly: true
           {{- end }}
       {{- if .Values.auth.enabled }}
       volumes:
-        - name: users
+        - name: htpasswd
           secret:
             secretName: {{ include "auth.secretName" . }}
       {{- end }}

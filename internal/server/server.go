@@ -1,21 +1,25 @@
 package server
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
-	"github.com/spf13/viper"
+	"github.com/tg123/go-htpasswd"
 	"github.com/things-go/go-socks5"
 )
 
-// defaultConfigFile is the location where the users config file is expected
-// when PROXY_CONFIG_FILE is not set. In Kubernetes this is a mounted Secret.
-const defaultConfigFile = "/etc/proxysocks/users.yaml"
+// defaultConfigFile is the location where the htpasswd credentials file is
+// expected when PROXY_CONFIG_FILE is not set. In Kubernetes this is a mounted
+// Secret.
+const defaultConfigFile = "/etc/proxysocks/htpasswd"
 
 var (
 	userConnectMetric = promauto.NewCounterVec(prometheus.CounterOpts{
@@ -24,10 +28,14 @@ var (
 	}, []string{"user"})
 )
 
-// user represents a single set of proxy credentials.
-type user struct {
-	Username string `mapstructure:"username"`
-	Password string `mapstructure:"password"`
+// htpasswdStore adapts an htpasswd file to the socks5.CredentialStore interface.
+type htpasswdStore struct {
+	file *htpasswd.File
+}
+
+// Valid implements socks5.CredentialStore.
+func (s htpasswdStore) Valid(user, password, _ string) bool {
+	return s.file.Match(user, password)
 }
 
 // New builds the SOCKS5 server with an authenticator derived from the
@@ -53,64 +61,93 @@ func New() *socks5.Server {
 	return server
 }
 
-// authenticatorFromConfig builds the authenticator from a users config file,
-// or falls back to no authentication when no config file is present.
+// authenticatorFromConfig builds the authenticator from an htpasswd file, or
+// falls back to no authentication when no config file is present.
 func authenticatorFromConfig() (socks5.Authenticator, error) {
-	users, err := loadUsers()
+	file, count, err := loadHtpasswd()
 	if err != nil {
 		return nil, err
 	}
 
-	if len(users) == 0 {
+	if file == nil {
 		log.Println("No authentication required")
 		return socks5.NoAuthAuthenticator{}, nil
 	}
 
-	creds := socks5.StaticCredentials{}
-	for _, u := range users {
-		if u.Username == "" || u.Password == "" {
-			return nil, fmt.Errorf("user entries must have a non-empty username and password")
-		}
-		if _, exists := creds[u.Username]; exists {
-			return nil, fmt.Errorf("duplicate username %q in configuration", u.Username)
-		}
-		creds[u.Username] = u.Password
-	}
-
-	log.Printf("Authentication enabled for %d user(s)", len(creds))
-	return socks5.UserPassAuthenticator{Credentials: creds}, nil
+	log.Printf("Authentication enabled for %d user(s)", count)
+	return socks5.UserPassAuthenticator{Credentials: htpasswdStore{file: file}}, nil
 }
 
-// loadUsers reads the users config file if it exists. A missing file is not an
-// error and yields an empty list so the caller can fall back to other sources.
-// A present file that yields no users is an error, so a misconfigured mount
-// cannot silently start the server without authentication.
-func loadUsers() ([]user, error) {
+// loadHtpasswd reads the htpasswd credentials file if it exists. A missing file
+// is not an error and yields a nil file so the caller can fall back to no
+// authentication. A present file is parsed strictly: a malformed line, a
+// duplicate username, or a file with no credentials is an error, so a
+// misconfigured mount cannot silently start the server without authentication.
+func loadHtpasswd() (*htpasswd.File, int, error) {
 	path := os.Getenv("PROXY_CONFIG_FILE")
 	if path == "" {
 		path = defaultConfigFile
 	}
 
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return nil, nil
+		return nil, 0, nil
 	} else if err != nil {
-		return nil, fmt.Errorf("checking config file %q: %w", path, err)
+		return nil, 0, fmt.Errorf("checking config file %q: %w", path, err)
 	}
 
-	v := viper.New()
-	v.SetConfigFile(path)
-	if err := v.ReadInConfig(); err != nil {
-		return nil, fmt.Errorf("reading config file %q: %w", path, err)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, 0, fmt.Errorf("reading config file %q: %w", path, err)
 	}
 
-	var users []user
-	if err := v.UnmarshalKey("users", &users); err != nil {
-		return nil, fmt.Errorf("parsing users from %q: %w", path, err)
+	count, err := countCredentials(data)
+	if err != nil {
+		return nil, 0, fmt.Errorf("parsing config file %q: %w", path, err)
 	}
-	if len(users) == 0 {
-		return nil, fmt.Errorf("config file %q contains no users", path)
+	if count == 0 {
+		return nil, 0, fmt.Errorf("config file %q contains no credentials", path)
 	}
-	return users, nil
+
+	var badLine error
+	file, err := htpasswd.NewFromReader(bytes.NewReader(data), htpasswd.DefaultSystems, func(err error) {
+		if badLine == nil {
+			badLine = err
+		}
+	})
+	if err != nil {
+		return nil, 0, fmt.Errorf("parsing config file %q: %w", path, err)
+	}
+	if badLine != nil {
+		return nil, 0, fmt.Errorf("parsing config file %q: %w", path, badLine)
+	}
+
+	return file, count, nil
+}
+
+// countCredentials scans htpasswd content, counting entries and rejecting
+// duplicate usernames. It mirrors go-htpasswd's line handling: whitespace-only
+// lines are ignored and each remaining line is split on the first colon.
+func countCredentials(data []byte) (int, error) {
+	seen := map[string]struct{}{}
+	scanner := bufio.NewScanner(bytes.NewReader(data))
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		username, _, ok := strings.Cut(line, ":")
+		if !ok {
+			return 0, fmt.Errorf("malformed line, no colon: %q", line)
+		}
+		if _, exists := seen[username]; exists {
+			return 0, fmt.Errorf("duplicate username %q", username)
+		}
+		seen[username] = struct{}{}
+	}
+	if err := scanner.Err(); err != nil {
+		return 0, err
+	}
+	return len(seen), nil
 }
 
 func UserConnect(ctx context.Context, writer io.Writer, request *socks5.Request) error {
