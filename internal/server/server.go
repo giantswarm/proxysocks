@@ -12,8 +12,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
-	"github.com/tg123/go-htpasswd"
 	"github.com/things-go/go-socks5"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // defaultConfigFile is the location where the htpasswd credentials file is
@@ -28,14 +28,17 @@ var (
 	}, []string{"user"})
 )
 
-// htpasswdStore adapts an htpasswd file to the socks5.CredentialStore interface.
-type htpasswdStore struct {
-	file *htpasswd.File
-}
+// bcryptCredentials maps usernames to bcrypt password hashes and implements
+// socks5.CredentialStore.
+type bcryptCredentials map[string]string
 
 // Valid implements socks5.CredentialStore.
-func (s htpasswdStore) Valid(user, password, _ string) bool {
-	return s.file.Match(user, password)
+func (c bcryptCredentials) Valid(user, password, _ string) bool {
+	hash, ok := c[user]
+	if !ok {
+		return false
+	}
+	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil
 }
 
 // New builds the SOCKS5 server with an authenticator derived from the
@@ -64,90 +67,85 @@ func New() *socks5.Server {
 // authenticatorFromConfig builds the authenticator from an htpasswd file, or
 // falls back to no authentication when no config file is present.
 func authenticatorFromConfig() (socks5.Authenticator, error) {
-	file, count, err := loadHtpasswd()
+	creds, err := loadHtpasswd()
 	if err != nil {
 		return nil, err
 	}
 
-	if file == nil {
+	if creds == nil {
 		log.Println("No authentication required")
 		return socks5.NoAuthAuthenticator{}, nil
 	}
 
-	log.Printf("Authentication enabled for %d user(s)", count)
-	return socks5.UserPassAuthenticator{Credentials: htpasswdStore{file: file}}, nil
+	log.Printf("Authentication enabled for %d user(s)", len(creds))
+	return socks5.UserPassAuthenticator{Credentials: creds}, nil
 }
 
 // loadHtpasswd reads the htpasswd credentials file if it exists. A missing file
-// is not an error and yields a nil file so the caller can fall back to no
+// is not an error and yields a nil map so the caller can fall back to no
 // authentication. A present file is parsed strictly: a malformed line, a
-// duplicate username, or a file with no credentials is an error, so a
-// misconfigured mount cannot silently start the server without authentication.
-func loadHtpasswd() (*htpasswd.File, int, error) {
+// non-bcrypt hash, a duplicate username, or a file with no credentials is an
+// error, so a misconfigured mount cannot silently start the server without
+// authentication.
+func loadHtpasswd() (bcryptCredentials, error) {
 	path := os.Getenv("PROXY_CONFIG_FILE")
 	if path == "" {
 		path = defaultConfigFile
 	}
 
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return nil, 0, nil
+		return nil, nil
 	} else if err != nil {
-		return nil, 0, fmt.Errorf("checking config file %q: %w", path, err)
+		return nil, fmt.Errorf("checking config file %q: %w", path, err)
 	}
 
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, 0, fmt.Errorf("reading config file %q: %w", path, err)
+		return nil, fmt.Errorf("reading config file %q: %w", path, err)
 	}
 
-	count, err := countCredentials(data)
+	creds, err := parseHtpasswd(data)
 	if err != nil {
-		return nil, 0, fmt.Errorf("parsing config file %q: %w", path, err)
+		return nil, fmt.Errorf("parsing config file %q: %w", path, err)
 	}
-	if count == 0 {
-		return nil, 0, fmt.Errorf("config file %q contains no credentials", path)
-	}
-
-	var badLine error
-	file, err := htpasswd.NewFromReader(bytes.NewReader(data), htpasswd.DefaultSystems, func(err error) {
-		if badLine == nil {
-			badLine = err
-		}
-	})
-	if err != nil {
-		return nil, 0, fmt.Errorf("parsing config file %q: %w", path, err)
-	}
-	if badLine != nil {
-		return nil, 0, fmt.Errorf("parsing config file %q: %w", path, badLine)
+	if len(creds) == 0 {
+		return nil, fmt.Errorf("config file %q contains no credentials", path)
 	}
 
-	return file, count, nil
+	return creds, nil
 }
 
-// countCredentials scans htpasswd content, counting entries and rejecting
-// duplicate usernames. It mirrors go-htpasswd's line handling: whitespace-only
-// lines are ignored and each remaining line is split on the first colon.
-func countCredentials(data []byte) (int, error) {
-	seen := map[string]struct{}{}
+// parseHtpasswd parses htpasswd content into a credential map. Whitespace-only
+// lines are ignored; every other line must be a "user:hash" pair with a bcrypt
+// hash. Only bcrypt is supported (e.g. from `htpasswd -B`); other schemes are
+// rejected so a misconfigured file fails at startup rather than silently never
+// matching.
+func parseHtpasswd(data []byte) (bcryptCredentials, error) {
+	creds := bcryptCredentials{}
 	scanner := bufio.NewScanner(bytes.NewReader(data))
+	line := 0
 	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
+		line++
+		text := strings.TrimSpace(scanner.Text())
+		if text == "" {
 			continue
 		}
-		username, _, ok := strings.Cut(line, ":")
-		if !ok {
-			return 0, fmt.Errorf("malformed line, no colon: %q", line)
+		user, hash, ok := strings.Cut(text, ":")
+		if !ok || user == "" || hash == "" {
+			return nil, fmt.Errorf("line %d: malformed entry, expected user:hash", line)
 		}
-		if _, exists := seen[username]; exists {
-			return 0, fmt.Errorf("duplicate username %q", username)
+		if _, exists := creds[user]; exists {
+			return nil, fmt.Errorf("line %d: duplicate username %q", line, user)
 		}
-		seen[username] = struct{}{}
+		if _, err := bcrypt.Cost([]byte(hash)); err != nil {
+			return nil, fmt.Errorf("line %d: user %q has a non-bcrypt hash (use `htpasswd -B`): %w", line, user, err)
+		}
+		creds[user] = hash
 	}
 	if err := scanner.Err(); err != nil {
-		return 0, err
+		return nil, err
 	}
-	return len(seen), nil
+	return creds, nil
 }
 
 func UserConnect(ctx context.Context, writer io.Writer, request *socks5.Request) error {

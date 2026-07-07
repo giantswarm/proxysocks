@@ -40,7 +40,7 @@ spec:
 
 #### Users
 
-Authentication supports multiple users. Credentials are provided in [htpasswd](https://httpd.apache.org/docs/current/programs/htpasswd.html) format via the `auth.htpasswd` value. Generate hashed entries with `htpasswd -nB <user>` and paste them in, one per line:
+Authentication supports multiple users. Credentials are provided in [htpasswd](https://httpd.apache.org/docs/current/programs/htpasswd.html) format via the `auth.htpasswd` value. Only bcrypt hashes are supported, so generate entries with `htpasswd -nB <user>` and paste them in, one per line:
 
 ```yaml
 auth:

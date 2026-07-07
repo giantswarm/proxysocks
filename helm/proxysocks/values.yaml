@@ -14,8 +14,8 @@ auth:
   # and use existingSecret to bring your own Secret (must contain an htpasswd key).
   createSecret: true
   existingSecret: ""
-  # htpasswd holds pre-hashed credentials in htpasswd format, one entry per line
-  # (e.g. from `htpasswd -nB user`).
+  # htpasswd holds credentials in htpasswd format, one entry per line. Only
+  # bcrypt hashes are supported, e.g. from `htpasswd -nB user`.
   htpasswd: ""
 
 service:

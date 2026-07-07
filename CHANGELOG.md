@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Support multiple users via a Secret-mounted htpasswd credentials file.
+- Support multiple users via a Secret-mounted htpasswd credentials file (bcrypt hashes).
 - Add `user` label to the `proxysocks_user_connect_total` metric.
 
 ### Changed

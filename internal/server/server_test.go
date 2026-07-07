@@ -1,21 +1,23 @@
 package server
 
 import (
-	"crypto/sha1"
-	"encoding/base64"
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/things-go/go-socks5"
+	"golang.org/x/crypto/bcrypt"
 )
 
-// shaEntry builds an htpasswd line using the {SHA} scheme, which go-htpasswd
-// recognizes via its DefaultSystems parsers.
-func shaEntry(username, password string) string {
-	sum := sha1.Sum([]byte(password))
-	return fmt.Sprintf("%s:{SHA}%s", username, base64.StdEncoding.EncodeToString(sum[:]))
+// bcryptEntry builds an htpasswd line with a bcrypt hash, as produced by
+// `htpasswd -B`.
+func bcryptEntry(t *testing.T, username, password string) string {
+	t.Helper()
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.MinCost)
+	if err != nil {
+		t.Fatalf("generate hash: %s", err)
+	}
+	return username + ":" + string(hash)
 }
 
 func writeConfig(t *testing.T, content string) string {
@@ -30,7 +32,7 @@ func writeConfig(t *testing.T, content string) string {
 
 func TestAuthenticatorFromConfig(t *testing.T) {
 	t.Run("users from config file", func(t *testing.T) {
-		path := writeConfig(t, shaEntry("alice", "s3cr3t")+"\n"+shaEntry("bob", "hunter2")+"\n")
+		path := writeConfig(t, bcryptEntry(t, "alice", "s3cr3t")+"\n"+bcryptEntry(t, "bob", "hunter2")+"\n")
 		t.Setenv("PROXY_CONFIG_FILE", path)
 
 		auth, err := authenticatorFromConfig()
@@ -50,7 +52,7 @@ func TestAuthenticatorFromConfig(t *testing.T) {
 	})
 
 	t.Run("duplicate username rejected", func(t *testing.T) {
-		path := writeConfig(t, shaEntry("alice", "a")+"\n"+shaEntry("alice", "b")+"\n")
+		path := writeConfig(t, bcryptEntry(t, "alice", "a")+"\n"+bcryptEntry(t, "alice", "b")+"\n")
 		t.Setenv("PROXY_CONFIG_FILE", path)
 
 		if _, err := authenticatorFromConfig(); err == nil {
@@ -64,6 +66,15 @@ func TestAuthenticatorFromConfig(t *testing.T) {
 
 		if _, err := authenticatorFromConfig(); err == nil {
 			t.Fatalf("expected error for malformed line")
+		}
+	})
+
+	t.Run("non-bcrypt hash rejected", func(t *testing.T) {
+		path := writeConfig(t, "alice:{SHA}W6ph5Mm5Pz8GgiULbPgzG37mj9g=\n")
+		t.Setenv("PROXY_CONFIG_FILE", path)
+
+		if _, err := authenticatorFromConfig(); err == nil {
+			t.Fatalf("expected error for non-bcrypt hash")
 		}
 	})
 
