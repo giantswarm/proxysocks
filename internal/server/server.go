@@ -53,20 +53,12 @@ func New() *socks5.Server {
 	return server
 }
 
-// authenticatorFromConfig builds the authenticator from, in order of
-// precedence: a users config file, the legacy single-user env vars, or no
-// authentication at all.
+// authenticatorFromConfig builds the authenticator from a users config file,
+// or falls back to no authentication when no config file is present.
 func authenticatorFromConfig() (socks5.Authenticator, error) {
 	users, err := loadUsers()
 	if err != nil {
 		return nil, err
-	}
-
-	// Fall back to the legacy single-user env vars when no config file is present.
-	if len(users) == 0 {
-		if u, p := os.Getenv("PROXY_USERNAME"), os.Getenv("PROXY_PASSWORD"); u != "" && p != "" {
-			users = []user{{Username: u, Password: p}}
-		}
 	}
 
 	if len(users) == 0 {

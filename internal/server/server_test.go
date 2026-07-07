@@ -60,36 +60,14 @@ func TestAuthenticatorFromConfig(t *testing.T) {
 	t.Run("empty users file rejected", func(t *testing.T) {
 		path := writeConfig(t, "users: []\n")
 		t.Setenv("PROXY_CONFIG_FILE", path)
-		t.Setenv("PROXY_USERNAME", "legacy")
-		t.Setenv("PROXY_PASSWORD", "pass")
 
 		if _, err := authenticatorFromConfig(); err == nil {
 			t.Fatalf("expected error for config file with no users")
 		}
 	})
 
-	t.Run("legacy env fallback", func(t *testing.T) {
+	t.Run("no auth when no config file present", func(t *testing.T) {
 		t.Setenv("PROXY_CONFIG_FILE", filepath.Join(t.TempDir(), "missing.yaml"))
-		t.Setenv("PROXY_USERNAME", "legacy")
-		t.Setenv("PROXY_PASSWORD", "pass")
-
-		auth, err := authenticatorFromConfig()
-		if err != nil {
-			t.Fatalf("unexpected error: %s", err)
-		}
-		upa, ok := auth.(socks5.UserPassAuthenticator)
-		if !ok {
-			t.Fatalf("expected UserPassAuthenticator, got %T", auth)
-		}
-		if !upa.Credentials.Valid("legacy", "pass", "") {
-			t.Fatalf("expected legacy user to validate")
-		}
-	})
-
-	t.Run("no auth when nothing configured", func(t *testing.T) {
-		t.Setenv("PROXY_CONFIG_FILE", filepath.Join(t.TempDir(), "missing.yaml"))
-		os.Unsetenv("PROXY_USERNAME")
-		os.Unsetenv("PROXY_PASSWORD")
 
 		auth, err := authenticatorFromConfig()
 		if err != nil {
