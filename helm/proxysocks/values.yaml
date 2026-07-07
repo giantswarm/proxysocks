@@ -9,7 +9,7 @@ image:
 
 # Authentication configuration
 auth:
-  enabled: true
+  enabled: false
   # createSecret renders the htpasswd content below into a Secret. Set to false
   # and use existingSecret to bring your own Secret (must contain an htpasswd key).
   createSecret: true

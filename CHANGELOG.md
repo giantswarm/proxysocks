@@ -16,9 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Deliver credentials through a mounted htpasswd file instead of environment variables.
 
-### Fixed
+### Removed
 
-- Correct the misspelled `PROXY_PASSWOWD` Secret key that prevented password auth via the chart.
+- Drop the `PROXY_USERNAME`/`PROXY_PASSWORD` env var auth in favor of the htpasswd file.
 
 ## [0.2.1] - 2025-08-27
 
