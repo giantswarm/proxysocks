@@ -9,10 +9,14 @@ image:
 
 # Authentication configuration
 auth:
-  enabled: true
-  credentials:
-    username: "admin"
-    password: "changeme"
+  enabled: false
+  # createSecret renders the htpasswd content below into a Secret. Set to false
+  # and use existingSecret to bring your own Secret (must contain an htpasswd key).
+  createSecret: true
+  existingSecret: ""
+  # htpasswd holds credentials in htpasswd format, one entry per line. Only
+  # bcrypt hashes are supported, e.g. from `htpasswd -nB user`.
+  htpasswd: ""
 
 service:
   type: LoadBalancer

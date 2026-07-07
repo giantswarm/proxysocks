@@ -39,7 +39,17 @@ spec:
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           {{- if .Values.auth.enabled }}
-          envFrom:
-            - secretRef:
-                name: {{ include "name" . }}
+          env:
+            - name: PROXY_CONFIG_FILE
+              value: /etc/proxysocks/htpasswd
+          volumeMounts:
+            - name: htpasswd
+              mountPath: /etc/proxysocks
+              readOnly: true
           {{- end }}
+      {{- if .Values.auth.enabled }}
+      volumes:
+        - name: htpasswd
+          secret:
+            secretName: {{ include "auth.secretName" . }}
+      {{- end }}

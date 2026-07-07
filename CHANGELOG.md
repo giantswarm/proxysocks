@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Support multiple users via a Secret-mounted htpasswd credentials file (bcrypt hashes).
+- Add `user` label to the `proxysocks_user_connect_total` metric.
+
+### Changed
+
+- Deliver credentials through a mounted htpasswd file instead of environment variables.
+
+### Removed
+
+- Drop the `PROXY_USERNAME`/`PROXY_PASSWORD` env var auth in favor of the htpasswd file.
+
 ## [0.2.1] - 2025-08-27
 
 ### Changed

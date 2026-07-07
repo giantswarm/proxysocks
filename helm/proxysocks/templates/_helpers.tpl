@@ -34,6 +34,20 @@ app: {{ include "name" . | quote }}
 {{- end -}}
 
 {{/*
+Name of the Secret providing the htpasswd file. Fails when authentication is enabled
+but no Secret will be available (createSecret is false and no existingSecret set).
+*/}}
+{{- define "auth.secretName" -}}
+{{- if .Values.auth.existingSecret -}}
+{{- .Values.auth.existingSecret -}}
+{{- else if .Values.auth.createSecret -}}
+{{- include "name" . -}}
+{{- else -}}
+{{- fail "auth.enabled is set but no Secret is available: set auth.createSecret=true or provide auth.existingSecret" -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
 Define image tag.
 */}}
 {{- define "image.tag" -}}

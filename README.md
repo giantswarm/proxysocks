@@ -38,5 +38,21 @@ spec:
 
 ### Configuration
 
-TODO: Add config examples.
+#### Users
+
+Authentication supports multiple users. Credentials are provided in [htpasswd](https://httpd.apache.org/docs/current/programs/htpasswd.html) format via the `auth.htpasswd` value. Only bcrypt hashes are supported, so generate entries with `htpasswd -nB <user>` and paste them in, one per line:
+
+```yaml
+auth:
+  enabled: true
+  htpasswd: |
+    alice:$2y$05$Q0F...
+    bob:$2y$05$9aB...
+```
+
+The chart renders this into a Secret and mounts it at `/etc/proxysocks/htpasswd`. To bring your own Secret instead, set `auth.createSecret: false` and `auth.existingSecret: <name>`; the Secret must contain an `htpasswd` key with the same format.
+
+Credentials are loaded once at startup. Changing users requires updating the Secret and restarting the pod.
+
+To disable authentication entirely, set `auth.enabled: false`.
 
