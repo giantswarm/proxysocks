@@ -1,11 +1,15 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -28,35 +32,59 @@ examples and usage of using your application. For example:
 Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
-	Run: func(cmd *cobra.Command, args []string) {
+	SilenceUsage: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
+		defer stop()
+		go func() {
+			<-ctx.Done()
+			// Restore default signal handling so a second signal
+			// terminates immediately instead of waiting for the drain.
+			stop()
+		}()
+
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
 
 		http.Handle("/metrics", promhttp.Handler())
 
+		metricsServer := &http.Server{
+			Addr:         ":8090",
+			Handler:      nil,
+			ReadTimeout:  5 * time.Second,
+			WriteTimeout: 10 * time.Second,
+			IdleTimeout:  15 * time.Second,
+		}
+		metricsErr := make(chan error, 1)
 		go func() {
 			log.Println("Starting HTTP server on :8090")
-			server := &http.Server{
-				Addr:         ":8090",
-				Handler:      nil,
-				ReadTimeout:  5 * time.Second,
-				WriteTimeout: 10 * time.Second,
-				IdleTimeout:  15 * time.Second,
+			if err := metricsServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				metricsErr <- fmt.Errorf("metrics server: %w", err)
 			}
-			err := server.ListenAndServe()
-			if errors.Is(err, http.ErrServerClosed) {
-				fmt.Printf("server closed\n")
-			} else if err != nil {
-				fmt.Printf("error starting server: %s\n", err)
-				os.Exit(1)
-			}
+			cancel()
 		}()
 
-		log.Println("Starting SOCKS5 proxy server on :8000")
-		server := server.New()
-		if err := server.ListenAndServe("tcp", ":8000"); err != nil {
-			panic(err)
+		ln, err := net.Listen("tcp", ":8000")
+		if err != nil {
+			return fmt.Errorf("listening on :8000: %w", err)
 		}
+
+		log.Println("Starting SOCKS5 proxy server on :8000")
+		serveErr := server.Serve(ctx, server.New(), ln)
+
+		// Keep /metrics scrapeable during the drain; shut it down last.
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer shutdownCancel()
+		if err := metricsServer.Shutdown(shutdownCtx); err != nil {
+			log.Printf("metrics server shutdown: %s", err)
+		}
+
+		select {
+		case err := <-metricsErr:
+			return err
+		default:
+		}
+		return serveErr
 	},
 }
 
