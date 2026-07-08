@@ -27,9 +27,13 @@ spec:
             - name: socks5
               containerPort: {{ .Values.service.port }}
           readinessProbe:
-            httpGet:
-              path: /healthz
-              port: 8090
+            tcpSocket:
+              port: socks5
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: socks5
             initialDelaySeconds: 5
             periodSeconds: 10
           {{- with .Values.resources }}

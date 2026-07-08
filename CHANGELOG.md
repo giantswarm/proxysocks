@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Probe the SOCKS5 port via `tcpSocket` for readiness and add a liveness probe.
+
+### Removed
+
+- Remove the always-ok `/healthz` endpoint.
+
 ## [0.3.0] - 2026-07-07
 
 ### Added
