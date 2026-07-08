@@ -32,7 +32,6 @@ to quickly create a Cobra application.`,
 	// has an action associated with it:
 	Run: func(cmd *cobra.Command, args []string) {
 
-		http.HandleFunc("/healthz", health)
 		http.Handle("/metrics", promhttp.Handler())
 
 		go func() {
@@ -106,8 +105,4 @@ func initConfig() {
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 	}
-}
-
-func health(w http.ResponseWriter, req *http.Request) {
-	_, _ = fmt.Fprintf(w, "ok\n")
 }
