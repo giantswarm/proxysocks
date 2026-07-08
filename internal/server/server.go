@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -124,6 +125,14 @@ func Serve(ctx context.Context, srv *socks5.Server, ln net.Listener) error {
 			defer wg.Done()
 			defer activeConnectionsMetric.Dec()
 			if err := srv.ServeConn(conn); err != nil {
+				// A client that opens a connection and closes it before
+				// completing the SOCKS5 handshake (e.g. a TCP health check or
+				// port probe) surfaces as EOF. That is benign, so log it at
+				// debug and do not count it as a connection error.
+				if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+					socksLog().Debug("client disconnected before handshake", "error", err)
+					return
+				}
 				connectionErrorMetric.Inc()
 				socksLog().Error("connection error", "error", err)
 			}

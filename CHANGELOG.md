@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Log pre-handshake EOF (e.g. from `tcpSocket` probes) at debug instead of error, and stop counting it as a connection error.
+
 ## [0.4.0] - 2026-07-08
 
 ### Added
