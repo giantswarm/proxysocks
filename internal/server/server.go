@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -62,6 +64,35 @@ func New() *socks5.Server {
 	// Setup server
 	server := socks5.NewServer(opts...)
 	return server
+}
+
+// Serve accepts connections on ln and serves them with srv until ctx is
+// canceled, then stops accepting and waits for in-flight connections to
+// finish before returning.
+func Serve(ctx context.Context, srv *socks5.Server, ln net.Listener) error {
+	defer context.AfterFunc(ctx, func() { _ = ln.Close() })()
+
+	var wg sync.WaitGroup
+	for {
+		conn, err := ln.Accept()
+		if err != nil {
+			if ctx.Err() != nil {
+				break
+			}
+			return err
+		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := srv.ServeConn(conn); err != nil {
+				log.Printf("socks5: connection error: %s", err)
+			}
+		}()
+	}
+
+	log.Println("socks5: draining in-flight connections")
+	wg.Wait()
+	return nil
 }
 
 // authenticatorFromConfig builds the authenticator from an htpasswd file, or

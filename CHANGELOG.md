@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Graceful shutdown: on SIGTERM, stop accepting, drain in-flight connections, then stop the metrics server.
+
 ### Changed
 
 - Probe the SOCKS5 port via `tcpSocket` for readiness and add a liveness probe.
