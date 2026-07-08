@@ -250,6 +250,14 @@ func TestValid(t *testing.T) {
 			t.Fatalf("expected one auth failure, got %v", got)
 		}
 	})
+
+	t.Run("unknown user with correct dummy-hash password fails", func(t *testing.T) {
+		// The dummy hash is compared for unknown users to equalize timing;
+		// it must never authenticate anyone, even with its own plaintext.
+		if creds.Valid("mallory", "proxysocks-dummy", "") {
+			t.Fatalf("expected unknown user to fail regardless of password")
+		}
+	})
 }
 
 func TestUserConnect(t *testing.T) {

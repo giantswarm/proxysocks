@@ -29,6 +29,14 @@ metrics:
   serviceMonitor:
     enabled: true
 
+networkPolicy:
+  enabled: true
+
+podDisruptionBudget:
+  # Rendered only when replicaCount > 1.
+  enabled: true
+  minAvailable: 1
+
 podSecurityContext:
   runAsUser: 1000
   runAsGroup: 1000

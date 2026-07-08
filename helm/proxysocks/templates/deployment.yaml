@@ -12,6 +12,12 @@ spec:
       {{- include "labels.selector" . | nindent 6 }}
   template:
     metadata:
+      {{- if and .Values.auth.enabled .Values.auth.createSecret }}
+      annotations:
+        # Roll pods when the managed htpasswd Secret changes. This does not
+        # cover auth.existingSecret, whose content the chart cannot see.
+        checksum/htpasswd: {{ include (print $.Template.BasePath "/secrets.yaml") . | sha256sum }}
+      {{- end }}
       labels:
         {{- include "labels.common" . | nindent 8 }}
     spec:

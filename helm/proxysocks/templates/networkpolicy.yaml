@@ -1,0 +1,25 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "name" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "labels.selector" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - ports:
+        - port: socks5
+          protocol: TCP
+        - port: metrics
+          protocol: TCP
+  # A SOCKS5 proxy must reach arbitrary destinations, so egress is unrestricted.
+  egress:
+    - {}
+{{- end }}

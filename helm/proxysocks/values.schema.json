@@ -74,6 +74,25 @@
                 }
             }
         },
+        "networkPolicy": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "podDisruptionBudget": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                },
+                "minAvailable": {
+                    "type": "integer"
+                }
+            }
+        },
         "replicaCount": {
             "type": "integer"
         },
