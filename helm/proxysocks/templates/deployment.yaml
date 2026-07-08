@@ -21,6 +21,15 @@ spec:
       labels:
         {{- include "labels.common" . | nindent 8 }}
     spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    {{- include "labels.selector" . | nindent 20 }}
+                topologyKey: kubernetes.io/hostname
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:

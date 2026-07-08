@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Chart: a ServiceMonitor and a ClusterIP metrics Service to scrape `/metrics` (toggle via `metrics.serviceMonitor.enabled`).
 - Configurable listen addresses via `--socks-address` and `--metrics-address` flags.
 - Chart: an optional NetworkPolicy (`networkPolicy.enabled`) and a PodDisruptionBudget rendered when `replicaCount > 1`.
+- Chart: pod anti-affinity to spread replicas across nodes and `unhealthyPodEvictionPolicy: AlwaysAllow` on the PodDisruptionBudget.
 - Chart: a `checksum/htpasswd` pod annotation so pods roll when the managed htpasswd Secret changes.
 - Tests for `Valid` and `UserConnect` (authenticated and anonymous).
 - Graceful shutdown: on SIGTERM, stop accepting, drain in-flight connections, then stop the metrics server.
