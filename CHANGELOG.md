@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Run 2 replicas by default (`replicaCount: 2`) for high availability.
 - Compare unknown users against a dummy bcrypt hash to prevent username enumeration by timing.
 - Probe the SOCKS5 port via `tcpSocket` for readiness and add a liveness probe.
 - Log in JSON via `log/slog`.
