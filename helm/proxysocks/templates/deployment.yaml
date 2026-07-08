@@ -23,7 +23,7 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: metrics
-              containerPort: 8090
+              containerPort: {{ .Values.metrics.port }}
             - name: socks5
               containerPort: {{ .Values.service.port }}
           readinessProbe:

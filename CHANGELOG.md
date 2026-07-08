@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Metrics: `proxysocks_auth_failures_total`, `proxysocks_active_connections`, and `proxysocks_connection_errors_total`.
+- Chart: a ServiceMonitor and a ClusterIP metrics Service to scrape `/metrics` (toggle via `metrics.serviceMonitor.enabled`).
 - Graceful shutdown: on SIGTERM, stop accepting, drain in-flight connections, then stop the metrics server.
 
 ### Changed

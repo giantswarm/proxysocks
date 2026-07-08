@@ -24,6 +24,11 @@ service:
   annotations:
     service.beta.kubernetes.io/aws-load-balancer-internal: "true"
 
+metrics:
+  port: 8090
+  serviceMonitor:
+    enabled: true
+
 podSecurityContext:
   runAsUser: 1000
   runAsGroup: 1000
