@@ -13,25 +13,21 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/giantswarm/proxysocks/internal/server"
 )
 
-var cfgFile string
+var (
+	socksAddr   string
+	metricsAddr string
+)
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "proxysocks",
-	Short: "A brief description of your application",
-	Long: `A longer description that spans multiple lines and likely contains
-examples and usage of using your application. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Use:           "proxysocks",
+	Short:         "A SOCKS5 proxy server with optional htpasswd authentication",
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -55,7 +51,7 @@ to quickly create a Cobra application.`,
 		http.Handle("/metrics", promhttp.Handler())
 
 		metricsServer := &http.Server{
-			Addr:         ":8090",
+			Addr:         metricsAddr,
 			Handler:      nil,
 			ReadTimeout:  5 * time.Second,
 			WriteTimeout: 10 * time.Second,
@@ -63,19 +59,19 @@ to quickly create a Cobra application.`,
 		}
 		metricsErr := make(chan error, 1)
 		go func() {
-			slog.Info("starting metrics server", "addr", ":8090")
+			slog.Info("starting metrics server", "addr", metricsAddr)
 			if err := metricsServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 				metricsErr <- fmt.Errorf("metrics server: %w", err)
 			}
 			cancel()
 		}()
 
-		ln, err := net.Listen("tcp", ":8000")
+		ln, err := net.Listen("tcp", socksAddr)
 		if err != nil {
-			return fmt.Errorf("listening on :8000: %w", err)
+			return fmt.Errorf("listening on %s: %w", socksAddr, err)
 		}
 
-		slog.Info("starting SOCKS5 proxy server", "addr", ":8000")
+		slog.Info("starting SOCKS5 proxy server", "addr", socksAddr)
 		serveErr := server.Serve(ctx, srv, ln)
 
 		// Keep /metrics scrapeable during the drain; shut it down last.
@@ -107,39 +103,6 @@ func Execute() {
 }
 
 func init() {
-	cobra.OnInitialize(initConfig)
-
-	// Here you will define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
-
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.proxysocks.yaml)")
-
-	// Cobra also supports local flags, which will only run
-	// when this action is called directly.
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
-}
-
-// initConfig reads in config file and ENV variables if set.
-func initConfig() {
-	if cfgFile != "" {
-		// Use config file from the flag.
-		viper.SetConfigFile(cfgFile)
-	} else {
-		// Find home directory.
-		home, err := os.UserHomeDir()
-		cobra.CheckErr(err)
-
-		// Search config in home directory with name ".proxysocks" (without extension).
-		viper.AddConfigPath(home)
-		viper.SetConfigType("yaml")
-		viper.SetConfigName(".proxysocks")
-	}
-
-	viper.AutomaticEnv() // read in environment variables that match
-
-	// If a config file is found, read it in.
-	if err := viper.ReadInConfig(); err == nil {
-		slog.Info("using config file", "path", viper.ConfigFileUsed())
-	}
+	rootCmd.Flags().StringVar(&socksAddr, "socks-address", ":8000", "address the SOCKS5 proxy listens on")
+	rootCmd.Flags().StringVar(&metricsAddr, "metrics-address", ":8090", "address the metrics server listens on")
 }
