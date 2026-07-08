@@ -6,7 +6,7 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net"
 	"os"
 	"strings"
@@ -43,27 +43,31 @@ func (c bcryptCredentials) Valid(user, password, _ string) bool {
 	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil
 }
 
+// slogAdapter implements socks5.Logger on top of slog.
+type slogAdapter struct {
+	logger *slog.Logger
+}
+
+// Errorf implements socks5.Logger.
+func (a slogAdapter) Errorf(format string, args ...interface{}) {
+	a.logger.Error(fmt.Sprintf(format, args...))
+}
+
 // New builds the SOCKS5 server with an authenticator derived from the
 // available configuration.
-func New() *socks5.Server {
-	logger := log.New(os.Stdout, "socks5: ", log.LstdFlags)
-
-	// Setup server options
+func New() (*socks5.Server, error) {
 	opts := []socks5.Option{
-		socks5.WithLogger(socks5.NewLogger(logger)),
+		socks5.WithLogger(slogAdapter{logger: slog.With("component", "socks5")}),
 		socks5.WithConnectMiddleware(UserConnect),
 	}
 
-	// Setup auth
 	authenticator, err := authenticatorFromConfig()
 	if err != nil {
-		log.Fatalf("failed to configure authentication: %s", err)
+		return nil, fmt.Errorf("configuring authentication: %w", err)
 	}
 	opts = append(opts, socks5.WithAuthMethods([]socks5.Authenticator{authenticator}))
 
-	// Setup server
-	server := socks5.NewServer(opts...)
-	return server
+	return socks5.NewServer(opts...), nil
 }
 
 // Serve accepts connections on ln and serves them with srv until ctx is
@@ -85,12 +89,12 @@ func Serve(ctx context.Context, srv *socks5.Server, ln net.Listener) error {
 		go func() {
 			defer wg.Done()
 			if err := srv.ServeConn(conn); err != nil {
-				log.Printf("socks5: connection error: %s", err)
+				slog.Error("connection error", "component", "socks5", "error", err)
 			}
 		}()
 	}
 
-	log.Println("socks5: draining in-flight connections")
+	slog.Info("draining in-flight connections", "component", "socks5")
 	wg.Wait()
 	return nil
 }
@@ -104,11 +108,11 @@ func authenticatorFromConfig() (socks5.Authenticator, error) {
 	}
 
 	if creds == nil {
-		log.Println("No authentication required")
+		slog.Info("no authentication required")
 		return socks5.NoAuthAuthenticator{}, nil
 	}
 
-	log.Printf("Authentication enabled for %d user(s)", len(creds))
+	slog.Info("authentication enabled", "users", len(creds))
 	return socks5.UserPassAuthenticator{Credentials: creds}, nil
 }
 
@@ -187,6 +191,6 @@ func UserConnect(ctx context.Context, writer io.Writer, request *socks5.Request)
 		}
 	}
 	userConnectMetric.WithLabelValues(user).Inc()
-	log.Printf("socks5: new connection from/to: %s %s (user: %s)", request.RemoteAddr, request.DestAddr, user)
+	slog.Info("new connection", "component", "socks5", "remote", request.RemoteAddr.String(), "destination", request.DestAddr.String(), "user", user)
 	return nil
 }

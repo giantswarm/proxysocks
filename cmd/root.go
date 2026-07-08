@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -32,8 +32,14 @@ examples and usage of using your application. For example:
 Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
-	SilenceUsage: true,
+	SilenceUsage:  true,
+	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		srv, err := server.New()
+		if err != nil {
+			return err
+		}
+
 		ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 		defer stop()
 		go func() {
@@ -57,7 +63,7 @@ to quickly create a Cobra application.`,
 		}
 		metricsErr := make(chan error, 1)
 		go func() {
-			log.Println("Starting HTTP server on :8090")
+			slog.Info("starting metrics server", "addr", ":8090")
 			if err := metricsServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 				metricsErr <- fmt.Errorf("metrics server: %w", err)
 			}
@@ -69,14 +75,14 @@ to quickly create a Cobra application.`,
 			return fmt.Errorf("listening on :8000: %w", err)
 		}
 
-		log.Println("Starting SOCKS5 proxy server on :8000")
-		serveErr := server.Serve(ctx, server.New(), ln)
+		slog.Info("starting SOCKS5 proxy server", "addr", ":8000")
+		serveErr := server.Serve(ctx, srv, ln)
 
 		// Keep /metrics scrapeable during the drain; shut it down last.
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer shutdownCancel()
 		if err := metricsServer.Shutdown(shutdownCtx); err != nil {
-			log.Printf("metrics server shutdown: %s", err)
+			slog.Error("metrics server shutdown", "error", err)
 		}
 
 		select {
@@ -91,8 +97,11 @@ to quickly create a Cobra application.`,
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, nil)))
+
 	err := rootCmd.Execute()
 	if err != nil {
+		slog.Error("command failed", "error", err)
 		os.Exit(1)
 	}
 }
@@ -131,6 +140,6 @@ func initConfig() {
 
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
-		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
+		slog.Info("using config file", "path", viper.ConfigFileUsed())
 	}
 }
