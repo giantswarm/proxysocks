@@ -43,6 +43,12 @@ func (c bcryptCredentials) Valid(user, password, _ string) bool {
 	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil
 }
 
+// socksLog returns a logger tagged with the socks5 component. It resolves the
+// default logger lazily so it picks up the handler configured in Execute.
+func socksLog() *slog.Logger {
+	return slog.With("component", "socks5")
+}
+
 // slogAdapter implements socks5.Logger on top of slog.
 type slogAdapter struct {
 	logger *slog.Logger
@@ -57,7 +63,7 @@ func (a slogAdapter) Errorf(format string, args ...interface{}) {
 // available configuration.
 func New() (*socks5.Server, error) {
 	opts := []socks5.Option{
-		socks5.WithLogger(slogAdapter{logger: slog.With("component", "socks5")}),
+		socks5.WithLogger(slogAdapter{logger: socksLog()}),
 		socks5.WithConnectMiddleware(UserConnect),
 	}
 
@@ -89,12 +95,12 @@ func Serve(ctx context.Context, srv *socks5.Server, ln net.Listener) error {
 		go func() {
 			defer wg.Done()
 			if err := srv.ServeConn(conn); err != nil {
-				slog.Error("connection error", "component", "socks5", "error", err)
+				socksLog().Error("connection error", "error", err)
 			}
 		}()
 	}
 
-	slog.Info("draining in-flight connections", "component", "socks5")
+	socksLog().Info("draining in-flight connections")
 	wg.Wait()
 	return nil
 }
@@ -191,6 +197,6 @@ func UserConnect(ctx context.Context, writer io.Writer, request *socks5.Request)
 		}
 	}
 	userConnectMetric.WithLabelValues(user).Inc()
-	slog.Info("new connection", "component", "socks5", "remote", request.RemoteAddr.String(), "destination", request.DestAddr.String(), "user", user)
+	socksLog().Info("new connection", "remote", request.RemoteAddr.String(), "destination", request.DestAddr.String(), "user", user)
 	return nil
 }
