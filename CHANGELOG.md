@@ -12,10 +12,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Metrics: `proxysocks_auth_failures_total`, `proxysocks_active_connections`, and `proxysocks_connection_errors_total`.
 - Chart: a ServiceMonitor and a ClusterIP metrics Service to scrape `/metrics` (toggle via `metrics.serviceMonitor.enabled`).
 - Configurable listen addresses via `--socks-address` and `--metrics-address` flags.
+- Chart: an optional NetworkPolicy (`networkPolicy.enabled`) and a PodDisruptionBudget rendered when `replicaCount > 1`.
+- Chart: pod anti-affinity to spread replicas across nodes and `unhealthyPodEvictionPolicy: AlwaysAllow` on the PodDisruptionBudget.
+- Chart: a `checksum/htpasswd` pod annotation so pods roll when the managed htpasswd Secret changes.
+- Tests for `Valid` and `UserConnect` (authenticated and anonymous).
 - Graceful shutdown: on SIGTERM, stop accepting, drain in-flight connections, then stop the metrics server.
 
 ### Changed
 
+- Run 2 replicas by default (`replicaCount: 2`) for high availability.
+- Compare unknown users against a dummy bcrypt hash to prevent username enumeration by timing.
 - Probe the SOCKS5 port via `tcpSocket` for readiness and add a liveness probe.
 - Log in JSON via `log/slog`.
 - Fail startup with an error instead of `log.Fatalf` when authentication cannot be configured.

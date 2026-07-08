@@ -1,5 +1,5 @@
 serviceType: "managed"
-replicaCount: 1
+replicaCount: 2
 
 image:
   registry: gsoci.azurecr.io
@@ -28,6 +28,14 @@ metrics:
   port: 8090
   serviceMonitor:
     enabled: true
+
+networkPolicy:
+  enabled: true
+
+podDisruptionBudget:
+  # Rendered only when replicaCount > 1.
+  enabled: true
+  minAvailable: 1
 
 podSecurityContext:
   runAsUser: 1000

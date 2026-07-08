@@ -49,14 +49,21 @@ var (
 // socks5.CredentialStore.
 type bcryptCredentials map[string]string
 
+// dummyHash is a valid bcrypt hash (cost 10, matching `htpasswd -B`) used to
+// equalize the timing of authentication for unknown users, so response time
+// does not reveal whether a username exists.
+const dummyHash = "$2a$10$anpA9jrSarctHL86tcM7.OM/w.gGzLjLSXBiIEqWtWM1xQlU1syZy"
+
 // Valid implements socks5.CredentialStore.
 func (c bcryptCredentials) Valid(user, password, _ string) bool {
 	hash, ok := c[user]
 	if !ok {
-		authFailureMetric.Inc()
-		return false
+		// Compare against a dummy hash so an unknown username costs the
+		// same as a known one and cannot be distinguished by timing.
+		hash = dummyHash
 	}
-	if bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) != nil {
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	if !ok || err != nil {
 		authFailureMetric.Inc()
 		return false
 	}
