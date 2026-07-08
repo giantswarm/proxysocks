@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Probe the SOCKS5 port via `tcpSocket` for readiness and add a liveness probe.
+- Log in JSON via `log/slog`.
+- Fail startup with an error instead of `log.Fatalf` when authentication cannot be configured.
 
 ### Removed
 
