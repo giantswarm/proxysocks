@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Metrics: `proxysocks_auth_failures_total`, `proxysocks_active_connections`, and `proxysocks_connection_errors_total`.
 - Chart: a ServiceMonitor and a ClusterIP metrics Service to scrape `/metrics` (toggle via `metrics.serviceMonitor.enabled`).
+- Configurable listen addresses via `--socks-address` and `--metrics-address` flags.
 - Graceful shutdown: on SIGTERM, stop accepting, drain in-flight connections, then stop the metrics server.
 
 ### Changed
@@ -18,10 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Probe the SOCKS5 port via `tcpSocket` for readiness and add a liveness probe.
 - Log in JSON via `log/slog`.
 - Fail startup with an error instead of `log.Fatalf` when authentication cannot be configured.
+- Inject the version at build time via ldflags instead of hardcoding it.
 
 ### Removed
 
 - Remove the always-ok `/healthz` endpoint.
+- Remove the unused viper config machinery and cobra scaffolding (`--config`, `toggle` flag, placeholder descriptions).
 
 ## [0.3.0] - 2026-07-07
 
