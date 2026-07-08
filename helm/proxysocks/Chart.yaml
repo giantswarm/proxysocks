@@ -2,9 +2,9 @@ apiVersion: v2
 name: proxysocks
 description: A Helm chart for the Giant Swarm Proxy
 type: application
-version: 0.3.0
+version: 0.4.0
 icon: https://s.giantswarm.io/app-icons/giantswarm/1/light.svg
-appVersion: 0.3.0
+appVersion: 0.4.0
 annotations:
   io.giantswarm.application.team: cabbage
   io.giantswarm.application.audience: "giantswarm"
