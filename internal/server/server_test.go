@@ -10,7 +10,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/things-go/go-socks5"
+	"github.com/things-go/go-socks5/statute"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -23,6 +25,16 @@ func bcryptEntry(t *testing.T, username, password string) string {
 		t.Fatalf("generate hash: %s", err)
 	}
 	return username + ":" + string(hash)
+}
+
+// mustHash returns a bcrypt hash of password, failing the test on error.
+func mustHash(t *testing.T, password string) string {
+	t.Helper()
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.MinCost)
+	if err != nil {
+		t.Fatalf("generate hash: %s", err)
+	}
+	return string(hash)
 }
 
 func writeConfig(t *testing.T, content string) string {
@@ -202,6 +214,73 @@ func TestServe(t *testing.T) {
 			}
 		case <-time.After(5 * time.Second):
 			t.Fatalf("Serve did not return after cancel")
+		}
+	})
+}
+
+func TestValid(t *testing.T) {
+	creds := bcryptCredentials{"alice": mustHash(t, "s3cr3t")}
+
+	t.Run("correct credentials succeed without counting a failure", func(t *testing.T) {
+		before := testutil.ToFloat64(authFailureMetric)
+		if !creds.Valid("alice", "s3cr3t", "") {
+			t.Fatalf("expected valid credentials to pass")
+		}
+		if got := testutil.ToFloat64(authFailureMetric) - before; got != 0 {
+			t.Fatalf("expected no auth failures, got %v", got)
+		}
+	})
+
+	t.Run("wrong password counts a failure", func(t *testing.T) {
+		before := testutil.ToFloat64(authFailureMetric)
+		if creds.Valid("alice", "wrong", "") {
+			t.Fatalf("expected wrong password to fail")
+		}
+		if got := testutil.ToFloat64(authFailureMetric) - before; got != 1 {
+			t.Fatalf("expected one auth failure, got %v", got)
+		}
+	})
+
+	t.Run("unknown user counts a failure", func(t *testing.T) {
+		before := testutil.ToFloat64(authFailureMetric)
+		if creds.Valid("mallory", "whatever", "") {
+			t.Fatalf("expected unknown user to fail")
+		}
+		if got := testutil.ToFloat64(authFailureMetric) - before; got != 1 {
+			t.Fatalf("expected one auth failure, got %v", got)
+		}
+	})
+}
+
+func TestUserConnect(t *testing.T) {
+	req := func(user string) *socks5.Request {
+		r := &socks5.Request{
+			RemoteAddr: &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 1234},
+			DestAddr:   &statute.AddrSpec{IP: net.IPv4(10, 0, 0, 1), Port: 80},
+		}
+		if user != "" {
+			r.AuthContext = &socks5.AuthContext{Payload: map[string]string{"username": user}}
+		}
+		return r
+	}
+
+	t.Run("counts against the authenticated user", func(t *testing.T) {
+		before := testutil.ToFloat64(userConnectMetric.WithLabelValues("alice"))
+		if err := UserConnect(context.Background(), io.Discard, req("alice")); err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+		if got := testutil.ToFloat64(userConnectMetric.WithLabelValues("alice")) - before; got != 1 {
+			t.Fatalf("expected one connection for alice, got %v", got)
+		}
+	})
+
+	t.Run("falls back to anonymous without auth context", func(t *testing.T) {
+		before := testutil.ToFloat64(userConnectMetric.WithLabelValues("anonymous"))
+		if err := UserConnect(context.Background(), io.Discard, req("")); err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+		if got := testutil.ToFloat64(userConnectMetric.WithLabelValues("anonymous")) - before; got != 1 {
+			t.Fatalf("expected one anonymous connection, got %v", got)
 		}
 	})
 }

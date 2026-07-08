@@ -28,6 +28,21 @@ var (
 		Name: "proxysocks_user_connect_total",
 		Help: "The total number of user connections",
 	}, []string{"user"})
+
+	authFailureMetric = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "proxysocks_auth_failures_total",
+		Help: "The total number of failed authentication attempts",
+	})
+
+	activeConnectionsMetric = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "proxysocks_active_connections",
+		Help: "The number of connections currently being served",
+	})
+
+	connectionErrorMetric = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "proxysocks_connection_errors_total",
+		Help: "The total number of connections that ended with an error",
+	})
 )
 
 // bcryptCredentials maps usernames to bcrypt password hashes and implements
@@ -38,9 +53,14 @@ type bcryptCredentials map[string]string
 func (c bcryptCredentials) Valid(user, password, _ string) bool {
 	hash, ok := c[user]
 	if !ok {
+		authFailureMetric.Inc()
 		return false
 	}
-	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil
+	if bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) != nil {
+		authFailureMetric.Inc()
+		return false
+	}
+	return true
 }
 
 // socksLog returns a logger tagged with the socks5 component. It resolves the
@@ -92,9 +112,12 @@ func Serve(ctx context.Context, srv *socks5.Server, ln net.Listener) error {
 			return err
 		}
 		wg.Add(1)
+		activeConnectionsMetric.Inc()
 		go func() {
 			defer wg.Done()
+			defer activeConnectionsMetric.Dec()
 			if err := srv.ServeConn(conn); err != nil {
+				connectionErrorMetric.Inc()
 				socksLog().Error("connection error", "error", err)
 			}
 		}()
