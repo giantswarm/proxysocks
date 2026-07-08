@@ -18,6 +18,7 @@ workflows:
       - architect/push-to-registries:
           context: architect
           name: push-to-registries
+          split-china-push: true
           requires:
             - go-build
           filters:
@@ -28,6 +29,17 @@ workflows:
               ignore:
                 - main
                 - master
+
+      - architect/sync-china-registry:
+          context: architect
+          name: sync-china-registry
+          requires:
+            - push-to-registries
+          filters:
+            tags:
+              only: /^v.*/
+            branches:
+              ignore: /^.*$/
 
       - architect/push-to-app-catalog:
           executor: app-build-suite
