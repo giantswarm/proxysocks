@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/binary"
 	"io"
 	"net"
 	"os"
@@ -97,13 +98,13 @@ func socksConnect(t *testing.T, proxy, target string) net.Conn {
 	if err != nil {
 		t.Fatalf("split target: %s", err)
 	}
-	port, err := strconv.Atoi(portStr)
+	port, err := strconv.ParseUint(portStr, 10, 16)
 	if err != nil {
 		t.Fatalf("target port: %s", err)
 	}
 	req := []byte{0x05, 0x01, 0x00, 0x01} // CONNECT, IPv4
 	req = append(req, net.ParseIP(host).To4()...)
-	req = append(req, byte(port>>8), byte(port))
+	req = binary.BigEndian.AppendUint16(req, uint16(port))
 	if _, err := conn.Write(req); err != nil {
 		t.Fatalf("write connect request: %s", err)
 	}

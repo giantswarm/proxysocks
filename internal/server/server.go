@@ -173,14 +173,11 @@ func loadHtpasswd() (bcryptCredentials, error) {
 		path = defaultConfigFile
 	}
 
-	if _, err := os.Stat(path); os.IsNotExist(err) {
+	// #nosec G304 G703 -- the path is operator-provided configuration, not user input.
+	data, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
 		return nil, nil
 	} else if err != nil {
-		return nil, fmt.Errorf("checking config file %q: %w", path, err)
-	}
-
-	data, err := os.ReadFile(path)
-	if err != nil {
 		return nil, fmt.Errorf("reading config file %q: %w", path, err)
 	}
 
