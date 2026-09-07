@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Chart: pass the configured ports to the proxy, so overriding `service.port` or `metrics.port` no longer leaves it listening on the defaults.
 - Close connections that stall during the SOCKS5 handshake instead of holding them open indefinitely.
 - Stop counting an aborted handshake, a handshake timeout, or a rejected authentication as a connection error.
 - Bound the shutdown drain so a long-lived tunnel cannot keep the process alive until it is killed.
