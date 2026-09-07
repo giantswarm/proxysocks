@@ -72,7 +72,7 @@ var rootCmd = &cobra.Command{
 		}
 
 		slog.Info("starting SOCKS5 proxy server", "addr", socksAddr)
-		serveErr := server.Serve(ctx, srv, ln)
+		serveErr := server.Serve(ctx, srv, ln, server.DefaultTimeouts())
 
 		// Keep /metrics scrapeable during the drain; shut it down last.
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)

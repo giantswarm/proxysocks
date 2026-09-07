@@ -14,6 +14,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -25,6 +26,31 @@ import (
 // expected when PROXY_CONFIG_FILE is not set. In Kubernetes this is a mounted
 // Secret.
 const defaultConfigFile = "/etc/proxysocks/htpasswd"
+
+// Timeouts bound a connection's lifecycle. go-socks5 sets no deadlines of its
+// own, so without these a client that connects and never speaks holds a
+// goroutine and a file descriptor for as long as the process lives, and blocks
+// shutdown while it does.
+type Timeouts struct {
+	// Handshake bounds how long a client has to complete the SOCKS5 greeting,
+	// authentication and request. It is lifted once the request is accepted,
+	// since a tunnel is expected to then stay open and idle.
+	Handshake time.Duration
+
+	// Drain bounds how long Serve waits for in-flight connections once the
+	// context is canceled. Proxied tunnels are long-lived by nature, so
+	// without a cap a single idle tunnel keeps the process alive until the
+	// container runtime kills it.
+	Drain time.Duration
+}
+
+// DefaultTimeouts returns the timeouts the proxy runs with.
+func DefaultTimeouts() Timeouts {
+	return Timeouts{
+		Handshake: 10 * time.Second,
+		Drain:     25 * time.Second,
+	}
+}
 
 var (
 	userConnectMetric = promauto.NewCounterVec(prometheus.CounterOpts{
@@ -143,6 +169,12 @@ func (a slogAdapter) Errorf(format string, args ...interface{}) {
 func New() (*socks5.Server, error) {
 	opts := []socks5.Option{
 		socks5.WithLogger(slogAdapter{logger: socksLog()}),
+		// The handshake deadline set in Serve has to be lifted once the
+		// request is through, for every command, or long-lived tunnels would
+		// be torn down mid-transfer.
+		socks5.WithConnectMiddleware(clearHandshakeDeadline),
+		socks5.WithBindMiddleware(clearHandshakeDeadline),
+		socks5.WithAssociateMiddleware(clearHandshakeDeadline),
 		socks5.WithConnectMiddleware(UserConnect),
 	}
 
@@ -156,9 +188,10 @@ func New() (*socks5.Server, error) {
 }
 
 // Serve accepts connections on ln and serves them with srv until ctx is
-// canceled, then stops accepting and waits for in-flight connections to
-// finish before returning.
-func Serve(ctx context.Context, srv *socks5.Server, ln net.Listener) error {
+// canceled, then stops accepting and waits up to timeouts.Drain for in-flight
+// connections to finish before returning. Each connection has
+// timeouts.Handshake to get through the SOCKS5 handshake.
+func Serve(ctx context.Context, srv *socks5.Server, ln net.Listener, timeouts Timeouts) error {
 	defer context.AfterFunc(ctx, func() { _ = ln.Close() })()
 
 	var wg sync.WaitGroup
@@ -175,6 +208,13 @@ func Serve(ctx context.Context, srv *socks5.Server, ln net.Listener) error {
 		go func() {
 			defer wg.Done()
 			defer activeConnectionsMetric.Dec()
+			// Bound the handshake. clearHandshakeDeadline lifts this once the
+			// client's request has been accepted.
+			if err := conn.SetDeadline(time.Now().Add(timeouts.Handshake)); err != nil {
+				socksLog().Error("setting handshake deadline", "error", err)
+				_ = conn.Close()
+				return
+			}
 			if err := srv.ServeConn(conn); err != nil {
 				// A client that opens a connection and closes it before
 				// completing the SOCKS5 handshake (e.g. a TCP health check or
@@ -184,14 +224,46 @@ func Serve(ctx context.Context, srv *socks5.Server, ln net.Listener) error {
 					socksLog().Debug("client disconnected before handshake", "error", err)
 					return
 				}
+				// A client that stalls mid-handshake trips the deadline set
+				// above. That is not an error worth alerting on either.
+				if errors.Is(err, os.ErrDeadlineExceeded) {
+					socksLog().Debug("client timed out during handshake", "error", err, "timeout", timeouts.Handshake)
+					return
+				}
 				connectionErrorMetric.Inc()
 				socksLog().Error("connection error", "error", err)
 			}
 		}()
 	}
 
-	socksLog().Info("draining in-flight connections")
-	wg.Wait()
+	socksLog().Info("draining in-flight connections", "timeout", timeouts.Drain)
+	drained := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(drained)
+	}()
+	select {
+	case <-drained:
+	case <-time.After(timeouts.Drain):
+		// The remaining connections are closed by the process exiting. Waiting
+		// any longer only delays that until the container runtime steps in.
+		socksLog().Warn("drain timeout reached, leaving connections to close on exit", "timeout", timeouts.Drain)
+	}
+	return nil
+}
+
+// clearHandshakeDeadline lifts the handshake deadline Serve set on the
+// connection, now that the client's request has been accepted and the
+// connection may legitimately sit idle. The writer a middleware receives is
+// the client connection itself.
+func clearHandshakeDeadline(_ context.Context, writer io.Writer, _ *socks5.Request) error {
+	conn, ok := writer.(net.Conn)
+	if !ok {
+		return nil
+	}
+	if err := conn.SetDeadline(time.Time{}); err != nil {
+		return fmt.Errorf("clearing handshake deadline: %w", err)
+	}
 	return nil
 }
 

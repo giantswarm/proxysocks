@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"io"
 	"net"
 	"os"
@@ -44,6 +45,31 @@ func mustCredentials(t *testing.T, hashes map[string]string) bcryptCredentials {
 		t.Fatalf("build credentials: %s", err)
 	}
 	return creds
+}
+
+// noAuthServer builds the real server via New with authentication disabled, so
+// the middleware wiring is exercised end to end.
+func noAuthServer(t *testing.T) *socks5.Server {
+	t.Helper()
+	t.Setenv("PROXY_CONFIG_FILE", filepath.Join(t.TempDir(), "missing"))
+	srv, err := New()
+	if err != nil {
+		t.Fatalf("new server: %s", err)
+	}
+	return srv
+}
+
+// serve runs Serve on a fresh listener and returns the address plus a channel
+// carrying its return value.
+func serve(t *testing.T, ctx context.Context, srv *socks5.Server, timeouts Timeouts) (string, <-chan error) {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen proxy: %s", err)
+	}
+	done := make(chan error, 1)
+	go func() { done <- Serve(ctx, srv, ln, timeouts) }()
+	return ln.Addr().String(), done
 }
 
 func writeConfig(t *testing.T, content string) string {
@@ -155,17 +181,12 @@ func echoRoundTrip(t *testing.T, conn net.Conn, msg string) {
 func TestServe(t *testing.T) {
 	t.Run("drains in-flight connections", func(t *testing.T) {
 		echo := echoListener(t)
-		ln, err := net.Listen("tcp", "127.0.0.1:0")
-		if err != nil {
-			t.Fatalf("listen proxy: %s", err)
-		}
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		done := make(chan error, 1)
-		go func() { done <- Serve(ctx, socks5.NewServer(), ln) }()
+		addr, done := serve(t, ctx, socks5.NewServer(), DefaultTimeouts())
 
-		client := socksConnect(t, ln.Addr().String(), echo.Addr().String())
+		client := socksConnect(t, addr, echo.Addr().String())
 		defer client.Close() // nolint: errcheck
 		echoRoundTrip(t, client, "hello")
 
@@ -174,7 +195,7 @@ func TestServe(t *testing.T) {
 		// New connections must be refused once the listener is closed.
 		deadline := time.Now().Add(5 * time.Second)
 		for {
-			conn, err := net.Dial("tcp", ln.Addr().String())
+			conn, err := net.Dial("tcp", addr)
 			if err != nil {
 				break
 			}
@@ -206,14 +227,8 @@ func TestServe(t *testing.T) {
 	})
 
 	t.Run("returns promptly when idle", func(t *testing.T) {
-		ln, err := net.Listen("tcp", "127.0.0.1:0")
-		if err != nil {
-			t.Fatalf("listen proxy: %s", err)
-		}
-
 		ctx, cancel := context.WithCancel(context.Background())
-		done := make(chan error, 1)
-		go func() { done <- Serve(ctx, socks5.NewServer(), ln) }()
+		_, done := serve(t, ctx, socks5.NewServer(), DefaultTimeouts())
 		cancel()
 
 		select {
@@ -223,6 +238,100 @@ func TestServe(t *testing.T) {
 			}
 		case <-time.After(5 * time.Second):
 			t.Fatalf("Serve did not return after cancel")
+		}
+	})
+
+	t.Run("closes a client that never sends the greeting", func(t *testing.T) {
+		timeouts := Timeouts{Handshake: 100 * time.Millisecond, Drain: 25 * time.Second}
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		addr, _ := serve(t, ctx, socks5.NewServer(), timeouts)
+
+		conn, err := net.Dial("tcp", addr)
+		if err != nil {
+			t.Fatalf("dial proxy: %s", err)
+		}
+		defer conn.Close() // nolint: errcheck
+
+		// Send nothing at all. The read must end once the handshake deadline
+		// passes rather than hanging on to the connection.
+		_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+		if _, err := conn.Read(make([]byte, 1)); err == nil {
+			t.Fatalf("expected the proxy to close a silent client")
+		} else if errors.Is(err, os.ErrDeadlineExceeded) {
+			t.Fatalf("proxy kept a silent client open past the handshake timeout")
+		}
+	})
+
+	t.Run("closes a client that stalls mid-handshake", func(t *testing.T) {
+		timeouts := Timeouts{Handshake: 100 * time.Millisecond, Drain: 25 * time.Second}
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		addr, _ := serve(t, ctx, socks5.NewServer(), timeouts)
+
+		conn, err := net.Dial("tcp", addr)
+		if err != nil {
+			t.Fatalf("dial proxy: %s", err)
+		}
+		defer conn.Close() // nolint: errcheck
+
+		// Greet, then stall before sending the request.
+		if _, err := conn.Write([]byte{0x05, 0x01, 0x00}); err != nil {
+			t.Fatalf("write greeting: %s", err)
+		}
+		if _, err := io.ReadFull(conn, make([]byte, 2)); err != nil {
+			t.Fatalf("read method selection: %s", err)
+		}
+
+		_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+		if _, err := conn.Read(make([]byte, 1)); err == nil {
+			t.Fatalf("expected the proxy to close a stalled client")
+		} else if errors.Is(err, os.ErrDeadlineExceeded) {
+			t.Fatalf("proxy kept a stalled client open past the handshake timeout")
+		}
+	})
+
+	t.Run("keeps an idle tunnel open past the handshake timeout", func(t *testing.T) {
+		// The handshake deadline must be lifted once the request is accepted,
+		// or a tunnel that sits idle would be torn down mid-session.
+		timeouts := Timeouts{Handshake: 200 * time.Millisecond, Drain: 25 * time.Second}
+		echo := echoListener(t)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		addr, _ := serve(t, ctx, noAuthServer(t), timeouts)
+
+		client := socksConnect(t, addr, echo.Addr().String())
+		defer client.Close() // nolint: errcheck
+
+		time.Sleep(500 * time.Millisecond)
+		echoRoundTrip(t, client, "still alive")
+	})
+
+	t.Run("stops draining after the drain timeout", func(t *testing.T) {
+		timeouts := Timeouts{Handshake: 10 * time.Second, Drain: 200 * time.Millisecond}
+		echo := echoListener(t)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		addr, done := serve(t, ctx, noAuthServer(t), timeouts)
+
+		client := socksConnect(t, addr, echo.Addr().String())
+		defer client.Close() // nolint: errcheck
+		echoRoundTrip(t, client, "hello")
+
+		// The tunnel stays open, so without a bounded drain Serve would never
+		// return.
+		cancel()
+		select {
+		case err := <-done:
+			if err != nil {
+				t.Fatalf("Serve returned error: %s", err)
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatalf("Serve did not return after the drain timeout")
 		}
 	})
 }
