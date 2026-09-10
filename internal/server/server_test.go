@@ -49,7 +49,7 @@ func mustCredentials(t *testing.T, hashes map[string]string) bcryptCredentials {
 
 // noAuthServer builds the real server via New with authentication disabled, so
 // the middleware wiring is exercised end to end.
-func noAuthServer(t *testing.T) *socks5.Server {
+func noAuthServer(t *testing.T) *Server {
 	t.Helper()
 	t.Setenv("PROXY_CONFIG_FILE", filepath.Join(t.TempDir(), "missing"))
 	srv, err := New()
@@ -59,16 +59,28 @@ func noAuthServer(t *testing.T) *socks5.Server {
 	return srv
 }
 
+// authServer builds the real server via New with one user configured, so a
+// client has to authenticate.
+func authServer(t *testing.T, user, password string) *Server {
+	t.Helper()
+	t.Setenv("PROXY_CONFIG_FILE", writeConfig(t, bcryptEntry(t, user, password)+"\n"))
+	srv, err := New()
+	if err != nil {
+		t.Fatalf("new server: %s", err)
+	}
+	return srv
+}
+
 // serve runs Serve on a fresh listener and returns the address plus a channel
 // carrying its return value.
-func serve(t *testing.T, ctx context.Context, srv *socks5.Server, timeouts Timeouts) (string, <-chan error) {
+func serve(t *testing.T, ctx context.Context, srv *Server, timeouts Timeouts) (string, <-chan error) {
 	t.Helper()
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("listen proxy: %s", err)
 	}
 	done := make(chan error, 1)
-	go func() { done <- Serve(ctx, srv, ln, timeouts) }()
+	go func() { done <- srv.Serve(ctx, ln, timeouts) }()
 	return ln.Addr().String(), done
 }
 
@@ -178,13 +190,32 @@ func echoRoundTrip(t *testing.T, conn net.Conn, msg string) {
 	_ = conn.SetDeadline(time.Time{})
 }
 
+// assertNoConnectionErrors fails if the connection error metric moved from
+// before. A handshake that fails is classified after the client has already
+// seen the close, so wait for the serving goroutine to finish first: it
+// releases the active connections gauge on its way out, past the point where
+// it would have counted an error.
+func assertNoConnectionErrors(t *testing.T, before float64) {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for testutil.ToFloat64(activeConnectionsMetric) != 0 {
+		if time.Now().After(deadline) {
+			t.Fatalf("the connection was still being served after 10s")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if got := testutil.ToFloat64(connectionErrorMetric) - before; got != 0 {
+		t.Fatalf("expected no connection errors, got %v", got)
+	}
+}
+
 func TestServe(t *testing.T) {
 	t.Run("drains in-flight connections", func(t *testing.T) {
 		echo := echoListener(t)
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		addr, done := serve(t, ctx, socks5.NewServer(), DefaultTimeouts())
+		addr, done := serve(t, ctx, newServer(), DefaultTimeouts())
 
 		client := socksConnect(t, addr, echo.Addr().String())
 		defer client.Close() // nolint: errcheck
@@ -228,7 +259,7 @@ func TestServe(t *testing.T) {
 
 	t.Run("returns promptly when idle", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
-		_, done := serve(t, ctx, socks5.NewServer(), DefaultTimeouts())
+		_, done := serve(t, ctx, newServer(), DefaultTimeouts())
 		cancel()
 
 		select {
@@ -243,10 +274,11 @@ func TestServe(t *testing.T) {
 
 	t.Run("closes a client that never sends the greeting", func(t *testing.T) {
 		timeouts := Timeouts{Handshake: 100 * time.Millisecond, Drain: 25 * time.Second}
+		before := testutil.ToFloat64(connectionErrorMetric)
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		addr, _ := serve(t, ctx, socks5.NewServer(), timeouts)
+		addr, _ := serve(t, ctx, newServer(), timeouts)
 
 		conn, err := net.Dial("tcp", addr)
 		if err != nil {
@@ -262,14 +294,20 @@ func TestServe(t *testing.T) {
 		} else if errors.Is(err, os.ErrDeadlineExceeded) {
 			t.Fatalf("proxy kept a silent client open past the handshake timeout")
 		}
+
+		assertNoConnectionErrors(t, before)
 	})
 
 	t.Run("closes a client that stalls mid-handshake", func(t *testing.T) {
+		// The read that trips the deadline happens past the greeting, where
+		// go-socks5 formats the error with %v, so the classification cannot
+		// rely on the error ServeConn returns.
 		timeouts := Timeouts{Handshake: 100 * time.Millisecond, Drain: 25 * time.Second}
+		before := testutil.ToFloat64(connectionErrorMetric)
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		addr, _ := serve(t, ctx, socks5.NewServer(), timeouts)
+		addr, _ := serve(t, ctx, newServer(), timeouts)
 
 		conn, err := net.Dial("tcp", addr)
 		if err != nil {
@@ -291,6 +329,134 @@ func TestServe(t *testing.T) {
 		} else if errors.Is(err, os.ErrDeadlineExceeded) {
 			t.Fatalf("proxy kept a stalled client open past the handshake timeout")
 		}
+
+		assertNoConnectionErrors(t, before)
+	})
+
+	t.Run("does not count a client that leaves after the greeting", func(t *testing.T) {
+		// A port probe that greets and hangs up surfaces as EOF on a read
+		// past the greeting, which is benign however far it got.
+		before := testutil.ToFloat64(connectionErrorMetric)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		addr, _ := serve(t, ctx, newServer(), DefaultTimeouts())
+
+		conn, err := net.Dial("tcp", addr)
+		if err != nil {
+			t.Fatalf("dial proxy: %s", err)
+		}
+		if _, err := conn.Write([]byte{0x05, 0x01, 0x00}); err != nil {
+			t.Fatalf("write greeting: %s", err)
+		}
+		if _, err := io.ReadFull(conn, make([]byte, 2)); err != nil {
+			t.Fatalf("read method selection: %s", err)
+		}
+		if err := conn.Close(); err != nil {
+			t.Fatalf("close client: %s", err)
+		}
+
+		assertNoConnectionErrors(t, before)
+	})
+
+	t.Run("does not count a client that resets mid-handshake", func(t *testing.T) {
+		// A scanner that aborts instead of closing leaves a reset behind,
+		// which is as benign as the EOF a clean close leaves.
+		before := testutil.ToFloat64(connectionErrorMetric)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		addr, _ := serve(t, ctx, newServer(), DefaultTimeouts())
+
+		conn, err := net.Dial("tcp", addr)
+		if err != nil {
+			t.Fatalf("dial proxy: %s", err)
+		}
+		tcp, ok := conn.(*net.TCPConn)
+		if !ok {
+			t.Fatalf("expected a TCP connection, got %T", conn)
+		}
+		if _, err := tcp.Write([]byte{0x05, 0x01, 0x00}); err != nil {
+			t.Fatalf("write greeting: %s", err)
+		}
+		if _, err := io.ReadFull(tcp, make([]byte, 2)); err != nil {
+			t.Fatalf("read method selection: %s", err)
+		}
+		// A zero linger makes the close send a reset instead of a FIN.
+		if err := tcp.SetLinger(0); err != nil {
+			t.Fatalf("set linger: %s", err)
+		}
+		if err := tcp.Close(); err != nil {
+			t.Fatalf("close client: %s", err)
+		}
+
+		assertNoConnectionErrors(t, before)
+	})
+
+	t.Run("does not count a rejected authentication", func(t *testing.T) {
+		// Anyone who can reach the listener can offer a wrong password, so
+		// counting it here would hand them the error rate. A failed login is
+		// counted by authFailureMetric and nowhere else.
+		beforeErrors := testutil.ToFloat64(connectionErrorMetric)
+		beforeFailures := testutil.ToFloat64(authFailureMetric)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		addr, _ := serve(t, ctx, authServer(t, "alice", "s3cr3t"), DefaultTimeouts())
+
+		conn, err := net.Dial("tcp", addr)
+		if err != nil {
+			t.Fatalf("dial proxy: %s", err)
+		}
+		defer conn.Close() // nolint: errcheck
+		_ = conn.SetDeadline(time.Now().Add(5 * time.Second))
+
+		// Greet offering user/pass auth, then send the wrong password.
+		if _, err := conn.Write([]byte{0x05, 0x01, statute.MethodUserPassAuth}); err != nil {
+			t.Fatalf("write greeting: %s", err)
+		}
+		reply := make([]byte, 2)
+		if _, err := io.ReadFull(conn, reply); err != nil {
+			t.Fatalf("read method selection: %s", err)
+		}
+		if reply[0] != 0x05 || reply[1] != statute.MethodUserPassAuth {
+			t.Fatalf("unexpected method selection: %v", reply)
+		}
+		req := []byte{statute.UserPassAuthVersion, byte(len("alice"))}
+		req = append(req, "alice"...)
+		req = append(req, byte(len("wrong")))
+		req = append(req, "wrong"...)
+		if _, err := conn.Write(req); err != nil {
+			t.Fatalf("write credentials: %s", err)
+		}
+		if _, err := io.ReadFull(conn, reply); err != nil {
+			t.Fatalf("read auth reply: %s", err)
+		}
+		if reply[1] == statute.AuthSuccess {
+			t.Fatalf("expected the wrong password to be rejected")
+		}
+
+		if got := testutil.ToFloat64(authFailureMetric) - beforeFailures; got != 1 {
+			t.Fatalf("expected one auth failure, got %v", got)
+		}
+		assertNoConnectionErrors(t, beforeErrors)
+	})
+
+	t.Run("keeps an idle tunnel open on a server built without New", func(t *testing.T) {
+		// Serve sets the handshake deadline whatever built the server, so
+		// every server has to carry the middleware that lifts it again.
+		timeouts := Timeouts{Handshake: 200 * time.Millisecond, Drain: 25 * time.Second}
+		echo := echoListener(t)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		addr, _ := serve(t, ctx, newServer(), timeouts)
+
+		client := socksConnect(t, addr, echo.Addr().String())
+		defer client.Close() // nolint: errcheck
+
+		time.Sleep(500 * time.Millisecond)
+		echoRoundTrip(t, client, "still alive")
 	})
 
 	t.Run("keeps an idle tunnel open past the handshake timeout", func(t *testing.T) {
