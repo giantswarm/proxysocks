@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Close connections that stall during the SOCKS5 handshake instead of holding them open indefinitely.
+- Stop counting an aborted handshake, a handshake timeout, or a rejected authentication as a connection error.
+- Bound the shutdown drain so a long-lived tunnel cannot keep the process alive until it is killed.
 - Generate the dummy bcrypt hash at the cost used by the htpasswd file, so unknown usernames are no longer identifiable by authentication response time.
 
 ## [0.4.1] - 2026-07-08
