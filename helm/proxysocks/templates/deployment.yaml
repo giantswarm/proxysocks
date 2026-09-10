@@ -36,6 +36,9 @@ spec:
         - name: proxysocks
           image: "{{.Values.image.registry}}/{{.Values.image.name}}:{{ include "image.tag" . }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - --socks-address=:{{ .Values.service.port }}
+            - --metrics-address=:{{ .Values.metrics.port }}
           ports:
             - name: metrics
               containerPort: {{ .Values.metrics.port }}
