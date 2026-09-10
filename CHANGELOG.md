@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Generate the dummy bcrypt hash at the cost used by the htpasswd file, so unknown usernames are no longer identifiable by authentication response time.
+
 ## [0.4.1] - 2026-07-08
 
 ### Fixed

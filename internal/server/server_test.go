@@ -21,21 +21,29 @@ import (
 // `htpasswd -B`.
 func bcryptEntry(t *testing.T, username, password string) string {
 	t.Helper()
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.MinCost)
-	if err != nil {
-		t.Fatalf("generate hash: %s", err)
-	}
-	return username + ":" + string(hash)
+	return username + ":" + mustHash(t, password, bcrypt.MinCost)
 }
 
-// mustHash returns a bcrypt hash of password, failing the test on error.
-func mustHash(t *testing.T, password string) string {
+// mustHash returns a bcrypt hash of password at the given cost, failing the
+// test on error.
+func mustHash(t *testing.T, password string, cost int) string {
 	t.Helper()
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.MinCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), cost)
 	if err != nil {
 		t.Fatalf("generate hash: %s", err)
 	}
 	return string(hash)
+}
+
+// mustCredentials builds a credential store from username to bcrypt hash
+// pairs, failing the test on error.
+func mustCredentials(t *testing.T, hashes map[string]string) bcryptCredentials {
+	t.Helper()
+	creds, err := newBcryptCredentials(hashes)
+	if err != nil {
+		t.Fatalf("build credentials: %s", err)
+	}
+	return creds
 }
 
 func writeConfig(t *testing.T, content string) string {
@@ -220,7 +228,7 @@ func TestServe(t *testing.T) {
 }
 
 func TestValid(t *testing.T) {
-	creds := bcryptCredentials{"alice": mustHash(t, "s3cr3t")}
+	creds := mustCredentials(t, map[string]string{"alice": mustHash(t, "s3cr3t", bcrypt.MinCost)})
 
 	t.Run("correct credentials succeed without counting a failure", func(t *testing.T) {
 		before := testutil.ToFloat64(authFailureMetric)
@@ -252,11 +260,56 @@ func TestValid(t *testing.T) {
 		}
 	})
 
-	t.Run("unknown user with correct dummy-hash password fails", func(t *testing.T) {
-		// The dummy hash is compared for unknown users to equalize timing;
-		// it must never authenticate anyone, even with its own plaintext.
-		if creds.Valid("mallory", "proxysocks-dummy", "") {
-			t.Fatalf("expected unknown user to fail regardless of password")
+	t.Run("unknown user fails whatever the password", func(t *testing.T) {
+		// The dummy hash is compared for unknown users to equalize timing; it
+		// must never authenticate anyone.
+		for _, password := range []string{"", "s3cr3t", string(creds.dummyHash)} {
+			if creds.Valid("mallory", password, "") {
+				t.Fatalf("expected unknown user to fail with password %q", password)
+			}
+		}
+	})
+}
+
+func TestNewBcryptCredentials(t *testing.T) {
+	t.Run("dummy hash matches the cheapest cost in the file", func(t *testing.T) {
+		// The unknown-user path must cost the same as the fastest known user,
+		// otherwise the response time reveals whether a username exists.
+		// `htpasswd -B` defaults to cost 5, so a hardcoded cost would not do.
+		creds := mustCredentials(t, map[string]string{
+			"expensive": mustHash(t, "s3cr3t", 6),
+			"cheap":     mustHash(t, "hunter2", 4),
+		})
+
+		cost, err := bcrypt.Cost(creds.dummyHash)
+		if err != nil {
+			t.Fatalf("dummy hash is not a bcrypt hash: %s", err)
+		}
+		if cost != 4 {
+			t.Fatalf("expected dummy hash at cost 4, got %d", cost)
+		}
+	})
+
+	t.Run("dummy hash differs across stores", func(t *testing.T) {
+		hashes := map[string]string{"user": mustHash(t, "s3cr3t", bcrypt.MinCost)}
+		first := mustCredentials(t, hashes)
+		second := mustCredentials(t, hashes)
+
+		if string(first.dummyHash) == string(second.dummyHash) {
+			t.Fatalf("expected a freshly generated dummy hash per store")
+		}
+	})
+
+	t.Run("no credentials rejected", func(t *testing.T) {
+		if _, err := newBcryptCredentials(map[string]string{}); err == nil {
+			t.Fatalf("expected error for an empty credential map")
+		}
+	})
+
+	t.Run("non-bcrypt hash rejected", func(t *testing.T) {
+		hashes := map[string]string{"user": "{SHA}W6ph5Mm5Pz8GgiULbPgzG37mj9g="}
+		if _, err := newBcryptCredentials(hashes); err == nil {
+			t.Fatalf("expected error for a non-bcrypt hash")
 		}
 	})
 }

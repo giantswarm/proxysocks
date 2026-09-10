@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -46,24 +48,73 @@ var (
 	})
 )
 
-// bcryptCredentials maps usernames to bcrypt password hashes and implements
-// socks5.CredentialStore.
-type bcryptCredentials map[string]string
+// bcryptCredentials holds usernames mapped to bcrypt password hashes and
+// implements socks5.CredentialStore.
+type bcryptCredentials struct {
+	hashes map[string]string
+	// dummyHash is compared for unknown usernames so that authenticating an
+	// unknown user costs the same as authenticating a known one. Its cost
+	// matches the cheapest hash in hashes, which is what makes the two
+	// indistinguishable by timing. It hashes a random password generated at
+	// startup, so it can never authenticate anyone.
+	dummyHash []byte
+}
 
-// dummyHash is a valid bcrypt hash (cost 10, matching `htpasswd -B`) used to
-// equalize the timing of authentication for unknown users, so response time
-// does not reveal whether a username exists.
-const dummyHash = "$2a$10$anpA9jrSarctHL86tcM7.OM/w.gGzLjLSXBiIEqWtWM1xQlU1syZy"
+// newBcryptCredentials builds a credential store from username to bcrypt hash
+// pairs. It derives the dummy hash used for unknown users from the costs
+// actually present in hashes: a hardcoded cost would only equalize timing for
+// files that happen to use the same one, and `htpasswd -B` defaults to cost 5
+// while a hardcoded cost 10 hash takes roughly 30 times longer to compare,
+// which turns the comparison into a username enumeration oracle.
+func newBcryptCredentials(hashes map[string]string) (bcryptCredentials, error) {
+	if len(hashes) == 0 {
+		return bcryptCredentials{}, errors.New("no credentials")
+	}
+
+	minCost, maxCost := 0, 0
+	for user, hash := range hashes {
+		cost, err := bcrypt.Cost([]byte(hash))
+		if err != nil {
+			return bcryptCredentials{}, fmt.Errorf("user %q has a non-bcrypt hash: %w", user, err)
+		}
+		if minCost == 0 || cost < minCost {
+			minCost = cost
+		}
+		if cost > maxCost {
+			maxCost = cost
+		}
+	}
+	if minCost != maxCost {
+		// Entries cheaper than the others stay distinguishable by how long
+		// they take to compare, whatever the unknown-user path costs.
+		slog.Warn("htpasswd entries use mixed bcrypt costs, which leaks which usernames exist by timing; rehash them at a single cost",
+			"min_cost", minCost, "max_cost", maxCost)
+	}
+
+	// A random password keeps the dummy hash from ever matching, even if its
+	// plaintext were guessed from the source.
+	secret := make([]byte, 32)
+	if _, err := rand.Read(secret); err != nil {
+		return bcryptCredentials{}, fmt.Errorf("generating dummy password: %w", err)
+	}
+	dummyHash, err := bcrypt.GenerateFromPassword([]byte(hex.EncodeToString(secret)), minCost)
+	if err != nil {
+		return bcryptCredentials{}, fmt.Errorf("generating dummy hash at cost %d: %w", minCost, err)
+	}
+
+	return bcryptCredentials{hashes: hashes, dummyHash: dummyHash}, nil
+}
 
 // Valid implements socks5.CredentialStore.
 func (c bcryptCredentials) Valid(user, password, _ string) bool {
-	hash, ok := c[user]
-	if !ok {
-		// Compare against a dummy hash so an unknown username costs the
-		// same as a known one and cannot be distinguished by timing.
-		hash = dummyHash
+	hash, ok := c.hashes[user]
+	// An unknown username is compared against the dummy hash so that it costs
+	// the same as a known one and cannot be distinguished by timing.
+	candidate := c.dummyHash
+	if ok {
+		candidate = []byte(hash)
 	}
-	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	err := bcrypt.CompareHashAndPassword(candidate, []byte(password))
 	if !ok || err != nil {
 		authFailureMetric.Inc()
 		return false
@@ -147,17 +198,22 @@ func Serve(ctx context.Context, srv *socks5.Server, ln net.Listener) error {
 // authenticatorFromConfig builds the authenticator from an htpasswd file, or
 // falls back to no authentication when no config file is present.
 func authenticatorFromConfig() (socks5.Authenticator, error) {
-	creds, err := loadHtpasswd()
+	hashes, err := loadHtpasswd()
 	if err != nil {
 		return nil, err
 	}
 
-	if creds == nil {
+	if hashes == nil {
 		slog.Info("no authentication required")
 		return socks5.NoAuthAuthenticator{}, nil
 	}
 
-	slog.Info("authentication enabled", "users", len(creds))
+	creds, err := newBcryptCredentials(hashes)
+	if err != nil {
+		return nil, err
+	}
+
+	slog.Info("authentication enabled", "users", len(hashes))
 	return socks5.UserPassAuthenticator{Credentials: creds}, nil
 }
 
@@ -167,7 +223,7 @@ func authenticatorFromConfig() (socks5.Authenticator, error) {
 // non-bcrypt hash, a duplicate username, or a file with no credentials is an
 // error, so a misconfigured mount cannot silently start the server without
 // authentication.
-func loadHtpasswd() (bcryptCredentials, error) {
+func loadHtpasswd() (map[string]string, error) {
 	path := os.Getenv("PROXY_CONFIG_FILE")
 	if path == "" {
 		path = defaultConfigFile
@@ -197,8 +253,8 @@ func loadHtpasswd() (bcryptCredentials, error) {
 // hash. Only bcrypt is supported (e.g. from `htpasswd -B`); other schemes are
 // rejected so a misconfigured file fails at startup rather than silently never
 // matching.
-func parseHtpasswd(data []byte) (bcryptCredentials, error) {
-	creds := bcryptCredentials{}
+func parseHtpasswd(data []byte) (map[string]string, error) {
+	creds := map[string]string{}
 	scanner := bufio.NewScanner(bytes.NewReader(data))
 	line := 0
 	for scanner.Scan() {
