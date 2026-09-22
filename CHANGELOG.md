@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Chart metadata: add `io.giantswarm.application.managed` annotation (`"true"`).
+- Chart metadata: add `home` URL.
+- Chart metadata: add `keywords`.
+
 ### Fixed
 
 - Chart: pass the configured ports to the proxy, so overriding `service.port` or `metrics.port` no longer leaves it listening on the defaults.
