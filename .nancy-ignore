@@ -1,2 +1,5 @@
-CVE-2026-56854 until=2026-10-04 # golang.org/x/crypto@v0.54.0
-CVE-2026-56855 until=2026-10-04 # golang.org/x/crypto@v0.54.0
+CVE-2026-78659 until=2026-11-13 # golang.org/x/net@v0.59.0
+CVE-2026-78660 until=2026-11-13 # golang.org/x/net@v0.59.0
+CVE-2026-78663 until=2026-11-13 # golang.org/x/net@v0.59.0
+CVE-2026-78669 until=2026-11-13 # golang.org/x/net@v0.59.0
+CVE-2026-97032 until=2026-11-13 # golang.org/x/net@v0.59.0
