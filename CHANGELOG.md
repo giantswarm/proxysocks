@@ -7,13 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-
-- Update architect to v10.12.0 (giantswarm/proxysocks#123)
-
-### Fixed
-
-- The `helm.sh/chart` label is valid for long chart versions: the 63-character cut trims the whole trailing run of `-`, `.` and `_`.
+## [0.5.0] - 2026-10-20
 
 ### Added
 
@@ -23,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The `helm.sh/chart` label is valid for long chart versions: the 63-character cut trims the whole trailing run of `-`, `.` and `_`.
 - Chart: pass the configured ports to the proxy, so overriding `service.port` or `metrics.port` no longer leaves it listening on the defaults.
 - Close connections that stall during the SOCKS5 handshake instead of holding them open indefinitely.
 - Stop counting an aborted handshake, a handshake timeout, or a rejected authentication as a connection error.
@@ -109,7 +104,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial release of the app.
 - Add support for credentials
 
-[Unreleased]: https://github.com/giantswarm/proxysocks/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/giantswarm/proxysocks/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/giantswarm/proxysocks/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/giantswarm/proxysocks/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/giantswarm/proxysocks/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/giantswarm/proxysocks/compare/v0.2.1...v0.3.0
