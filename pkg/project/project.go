@@ -3,7 +3,7 @@ package project
 var (
 	buildTimestamp = ""
 	gitSHA         = ""
-	version        = "0.4.2-dev"
+	version        = "0.5.0"
 )
 
 // BuildTimestamp returns the build time, injected at build time via ldflags.
