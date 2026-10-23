@@ -4,7 +4,8 @@ FROM scratch
 COPY --from=0 /etc/passwd /etc/passwd
 COPY --from=0 /etc/group /etc/group
 
-ADD proxysocks /
+ARG TARGETARCH
+COPY proxysocks-linux-${TARGETARCH} /proxysocks
 USER giantswarm
 
 ENTRYPOINT ["/proxysocks"]
