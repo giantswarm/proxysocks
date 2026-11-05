@@ -138,7 +138,7 @@
         },
         "podSecurityContext": {
             "type": "object",
-            "additionalProperties": false,
+            "additionalProperties": true,
             "properties": {
                 "runAsGroup": {
                     "type": "integer"
@@ -172,7 +172,7 @@
             "properties": {
                 "limits": {
                     "type": "object",
-                    "additionalProperties": false,
+                    "additionalProperties": true,
                     "properties": {
                         "memory": {
                             "type": "string"
@@ -181,7 +181,7 @@
                 },
                 "requests": {
                     "type": "object",
-                    "additionalProperties": false,
+                    "additionalProperties": true,
                     "properties": {
                         "cpu": {
                             "type": "string"
@@ -195,7 +195,7 @@
         },
         "securityContext": {
             "type": "object",
-            "additionalProperties": false,
+            "additionalProperties": true,
             "properties": {
                 "allowPrivilegeEscalation": {
                     "type": "boolean"
@@ -226,7 +226,7 @@
                 },
                 "annotations": {
                     "type": "object",
-                    "additionalProperties": false,
+                    "additionalProperties": true,
                     "properties": {
                         "service.beta.kubernetes.io/aws-load-balancer-internal": {
                             "type": "string"
