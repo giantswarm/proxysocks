@@ -55,4 +55,3 @@ The chart renders this into a Secret and mounts it at `/etc/proxysocks/htpasswd`
 Credentials are loaded once at startup. Changing users requires updating the Secret and restarting the pod.
 
 To disable authentication entirely, set `auth.enabled: false`.
-

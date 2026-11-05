@@ -9,4 +9,3 @@ COPY proxysocks-linux-${TARGETARCH} /proxysocks
 USER giantswarm
 
 ENTRYPOINT ["/proxysocks"]
-

@@ -21,7 +21,7 @@ auth:
 service:
   type: LoadBalancer
   port: 8000
-  annotations:
+  annotations:  # @schema additionalProperties: true
     service.beta.kubernetes.io/aws-load-balancer-internal: "true"
 
 metrics:
@@ -37,14 +37,14 @@ podDisruptionBudget:
   enabled: true
   minAvailable: 1
 
-podSecurityContext:
+podSecurityContext:  # @schema additionalProperties: true
   runAsUser: 1000
   runAsGroup: 1000
   runAsNonRoot: true
   seccompProfile:
     type: RuntimeDefault
 
-securityContext:
+securityContext:  # @schema additionalProperties: true
   allowPrivilegeEscalation: false
   readOnlyRootFilesystem: true
   capabilities:
@@ -52,8 +52,8 @@ securityContext:
       - ALL
 
 resources:
-  requests:
+  requests:  # @schema additionalProperties: true
     cpu: 100m
     memory: 100Mi
-  limits:
+  limits:  # @schema additionalProperties: true
     memory: 200Mi

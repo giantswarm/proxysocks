@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fix ARM64 images.
+- Allow extra keys in `service.annotations`, `resources`, `securityContext` and `podSecurityContext` values.
+- Set the `app.kubernetes.io/name` label to the chart name.
 
 ## [0.5.0] - 2026-10-20
 
