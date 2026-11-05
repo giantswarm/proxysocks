@@ -1,9 +1,11 @@
 {
-    "$schema": "http://json-schema.org/schema#",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
+    "additionalProperties": false,
     "properties": {
         "auth": {
             "type": "object",
+            "additionalProperties": false,
             "properties": {
                 "createSecret": {
                     "type": "boolean"
@@ -19,8 +21,64 @@
                 }
             }
         },
+        "baseDomain": {
+            "type": "string"
+        },
+        "bootstrapMode": {
+            "type": "object",
+            "additionalProperties": true
+        },
+        "chartOperator": {
+            "type": "object",
+            "additionalProperties": true
+        },
+        "ciliumNetworkPolicy": {
+            "type": "object",
+            "additionalProperties": true
+        },
+        "cluster": {
+            "type": "object",
+            "additionalProperties": true
+        },
+        "clusterCA": {
+            "type": "string"
+        },
+        "clusterCIDR": {
+            "type": "string"
+        },
+        "clusterDNSIP": {
+            "type": "string"
+        },
+        "clusterID": {
+            "type": "string"
+        },
+        "externalDNSIP": {
+            "type": "string"
+        },
+        "gcpProject": {
+            "type": "string"
+        },
+        "global": {
+            "type": [
+                "object",
+                "null"
+            ],
+            "description": "Global values shared between all subcharts and the platform.",
+            "additionalProperties": true,
+            "properties": {
+                "podSecurityStandards": {
+                    "type": "object",
+                    "additionalProperties": true
+                }
+            }
+        },
+        "helm": {
+            "type": "object",
+            "additionalProperties": true
+        },
         "image": {
             "type": "object",
+            "additionalProperties": false,
             "properties": {
                 "name": {
                     "type": "string"
@@ -36,8 +94,51 @@
                 }
             }
         },
+        "managementCluster": {
+            "type": "string"
+        },
+        "metrics": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "port": {
+                    "type": "integer"
+                },
+                "serviceMonitor": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean"
+                        }
+                    }
+                }
+            }
+        },
+        "networkPolicy": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "podDisruptionBudget": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                },
+                "minAvailable": {
+                    "type": "integer"
+                }
+            }
+        },
         "podSecurityContext": {
             "type": "object",
+            "additionalProperties": false,
             "properties": {
                 "runAsGroup": {
                     "type": "integer"
@@ -50,6 +151,7 @@
                 },
                 "seccompProfile": {
                     "type": "object",
+                    "additionalProperties": false,
                     "properties": {
                         "type": {
                             "type": "string"
@@ -58,49 +160,19 @@
                 }
             }
         },
-        "metrics": {
-            "type": "object",
-            "properties": {
-                "port": {
-                    "type": "integer"
-                },
-                "serviceMonitor": {
-                    "type": "object",
-                    "properties": {
-                        "enabled": {
-                            "type": "boolean"
-                        }
-                    }
-                }
-            }
-        },
-        "networkPolicy": {
-            "type": "object",
-            "properties": {
-                "enabled": {
-                    "type": "boolean"
-                }
-            }
-        },
-        "podDisruptionBudget": {
-            "type": "object",
-            "properties": {
-                "enabled": {
-                    "type": "boolean"
-                },
-                "minAvailable": {
-                    "type": "integer"
-                }
-            }
+        "provider": {
+            "type": "string"
         },
         "replicaCount": {
             "type": "integer"
         },
         "resources": {
             "type": "object",
+            "additionalProperties": false,
             "properties": {
                 "limits": {
                     "type": "object",
+                    "additionalProperties": false,
                     "properties": {
                         "memory": {
                             "type": "string"
@@ -109,6 +181,7 @@
                 },
                 "requests": {
                     "type": "object",
+                    "additionalProperties": false,
                     "properties": {
                         "cpu": {
                             "type": "string"
@@ -122,12 +195,14 @@
         },
         "securityContext": {
             "type": "object",
+            "additionalProperties": false,
             "properties": {
                 "allowPrivilegeEscalation": {
                     "type": "boolean"
                 },
                 "capabilities": {
                     "type": "object",
+                    "additionalProperties": false,
                     "properties": {
                         "drop": {
                             "type": "array",
@@ -144,9 +219,14 @@
         },
         "service": {
             "type": "object",
+            "additionalProperties": false,
             "properties": {
+                "type": {
+                    "type": "string"
+                },
                 "annotations": {
                     "type": "object",
+                    "additionalProperties": false,
                     "properties": {
                         "service.beta.kubernetes.io/aws-load-balancer-internal": {
                             "type": "string"
@@ -155,13 +235,13 @@
                 },
                 "port": {
                     "type": "integer"
-                },
-                "type": {
-                    "type": "string"
                 }
             }
         },
         "serviceType": {
+            "type": "string"
+        },
+        "subscriptionID": {
             "type": "string"
         }
     }
